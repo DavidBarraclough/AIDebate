@@ -27,6 +27,13 @@ const PERSONAS = {
   },
 }
 
+const MALE_VOICES   = ['Puck','Charon','Fenrir','Orus','Orbit','Algieba','Achernar','Rasalased','Sadachbia','Gacrux']
+const FEMALE_VOICES = ['Kore','Aoede','Zephyr','Leda','Schedar','Sulafat','Despina','Erinome','Vindemiatrix']
+const pickVoice = (gender) => {
+  const pool = gender === 'female' ? FEMALE_VOICES : MALE_VOICES
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
 // Gemini TTS prebuilt voices (confirmed working with gemini-2.5-flash-preview-tts)
 const VOICE_OPTIONS = [
   { value: 'Puck',       label: 'Puck',       desc: '♂ Upbeat' },
@@ -220,8 +227,14 @@ export default function GeminiSelfChatAudio() {
   const [names, setNames] = useState({ ...DEFAULT_NAMES })
   const DEFAULT_VOICES = { A: PERSONAS.A.defaultVoice, B: PERSONAS.B.defaultVoice }
   const [voices, setVoices] = useState({ ...DEFAULT_VOICES })
+  const [randomising, setRandomising] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [splitPercent, setSplitPercent] = useState(50)
+  const [draggingSplit, setDraggingSplit] = useState(false)
+  const [paused, setPaused] = useState(false)
   const startTimeRef = useRef(null)
+  const mainAreaRef = useRef(null)
+  const isDraggingRef = useRef(false)
   const MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
   const bottomRef = useRef(null)
   const stopRef = useRef(false)
@@ -231,6 +244,12 @@ export default function GeminiSelfChatAudio() {
   const personalitiesRef = useRef({ ...DEFAULT_PERSONALITIES })
   const namesRef = useRef({ ...DEFAULT_NAMES })
   const voicesRef = useRef({ ...DEFAULT_VOICES })
+  // Debate state persisted across pause/resume
+  const historyARef = useRef([])
+  const historyBRef = useRef([])
+  const lastMessageRef = useRef('')
+  const currentTurnRef = useRef('A')
+  const elapsedBeforePauseRef = useRef(0)
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60).toString().padStart(2, '0')
@@ -252,9 +271,12 @@ export default function GeminiSelfChatAudio() {
   }, [messages])
 
   useEffect(() => {
-    if (!running) { setElapsed(0); return }
+    if (!running) return
     const interval = setInterval(() => {
-      if (startTimeRef.current) setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000))
+      if (startTimeRef.current) {
+        const total = elapsedBeforePauseRef.current + (Date.now() - startTimeRef.current)
+        setElapsed(Math.floor(total / 1000))
+      }
     }, 1000)
     return () => clearInterval(interval)
   }, [running])
@@ -272,6 +294,27 @@ export default function GeminiSelfChatAudio() {
   const updateVoice = (persona, value) => {
     voicesRef.current[persona] = value
     setVoices(prev => ({ ...prev, [persona]: value }))
+  }
+
+  const randomise = async () => {
+    setRandomising(true)
+    setError(null)
+    try {
+      const res = await fetch('http://localhost:3001/api/generate-setup', { method: 'POST' })
+      const setup = await res.json()
+      if (setup.error) throw new Error(setup.error)
+      updateName('A', setup.A.name)
+      updateName('B', setup.B.name)
+      updatePersonality('A', setup.A.personality)
+      updatePersonality('B', setup.B.personality)
+      updateVoice('A', pickVoice(setup.A.gender))
+      updateVoice('B', pickVoice(setup.B.gender))
+      setTopic(setup.topic)
+    } catch (err) {
+      setError('Could not generate setup: ' + err.message)
+    } finally {
+      setRandomising(false)
+    }
   }
 
   const generateSelfPortrait = async (persona) => {
@@ -429,46 +472,52 @@ export default function GeminiSelfChatAudio() {
 
   const start = async () => {
     if (!topic.trim() || running) return
-    setMessages([])
-    setImages({})
-    setViewIndex(null)
-    setLastMessages({ A: '', B: '' })
-    setAvatarImages({ A: null, B: null })
-    setError(null)
+    const isResume = paused
+
+    if (!isResume) {
+      // Fresh start
+      setMessages([])
+      setImages({})
+      setViewIndex(null)
+      setLastMessages({ A: '', B: '' })
+      setAvatarImages({ A: null, B: null })
+      setError(null)
+      historyARef.current = []
+      historyBRef.current = []
+      lastMessageRef.current = `Let's discuss: ${topic.trim()}`
+      currentTurnRef.current = 'A'
+      elapsedBeforePauseRef.current = 0
+      // Generate self-portraits for both AIs in parallel
+      generateSelfPortrait('A')
+      generateSelfPortrait('B')
+    }
+
     setRunning(true)
+    setPaused(false)
     stopRef.current = false
     startTimeRef.current = Date.now()
     try { if (currentAudioRef.current) currentAudioRef.current.stop() } catch {}
 
-    // Generate self-portraits for both AIs in parallel (don't await — they update state when ready)
-    generateSelfPortrait('A')
-    generateSelfPortrait('B')
-
-    const historyA = []
-    const historyB = []
-    let lastMessage = `Let's discuss: ${topic.trim()}`
-    let currentTurn = 'A'
-
     try {
       while (true) {
         if (stopRef.current) break
-        if (Date.now() - startTimeRef.current >= MAX_DURATION_MS) break
+        const totalElapsed = elapsedBeforePauseRef.current + (Date.now() - startTimeRef.current)
+        if (totalElapsed >= MAX_DURATION_MS) break
 
-        const reply = await callTurn(currentTurn, currentTurn === 'A' ? historyA : historyB, lastMessage)
+        const turn = currentTurnRef.current
+        const reply = await callTurn(turn, turn === 'A' ? historyARef.current : historyBRef.current, lastMessageRef.current)
 
-        const activeHistory = currentTurn === 'A' ? historyA : historyB
-        activeHistory.push({ role: 'user', content: lastMessage })
+        const activeHistory = turn === 'A' ? historyARef.current : historyBRef.current
+        activeHistory.push({ role: 'user', content: lastMessageRef.current })
         activeHistory.push({ role: 'model', content: reply })
 
-        // Capture the actual message index (user interrupt messages shift indices)
         let msgIndex = -1
         setMessages(prev => {
           msgIndex = prev.length
-          return [...prev, { persona: currentTurn, content: reply }]
+          return [...prev, { persona: turn, content: reply }]
         })
-        setLastMessages(prev => ({ ...prev, [currentTurn]: reply }))
+        setLastMessages(prev => ({ ...prev, [turn]: reply }))
 
-        // Generate image in parallel with speech (skipped if disabled or quota hit)
         const imagePrompt = `Cinematic photorealistic illustration of "${topic}". Dramatic lighting, high quality digital art. Absolutely no text, words, letters, numbers, or writing visible anywhere in the image.`
         const imagePromise = imagesEnabled
           ? fetch('http://localhost:3001/api/image', {
@@ -489,14 +538,13 @@ export default function GeminiSelfChatAudio() {
             }).catch(err => console.error('Image fetch error:', err))
           : Promise.resolve()
 
-        setSpeaking(currentTurn)
+        setSpeaking(turn)
         await Promise.all([
-          speak(reply, currentTurn, voicesRef.current[currentTurn], muted, currentAudioRef),
+          speak(reply, turn, voicesRef.current[turn], muted, currentAudioRef),
           imagePromise,
         ])
         setSpeaking(null)
 
-        // Wait if user is mid-interrupt
         while (pauseDebateRef.current && !stopRef.current) {
           await new Promise(r => setTimeout(r, 100))
         }
@@ -505,26 +553,52 @@ export default function GeminiSelfChatAudio() {
         if (userInterruptRef.current) {
           const interrupt = userInterruptRef.current
           userInterruptRef.current = null
-          lastMessage = `The human moderator says: "${interrupt}". Briefly acknowledge this direction and redirect your response accordingly.`
+          lastMessageRef.current = `The human moderator says: "${interrupt}". Briefly acknowledge this direction and redirect your response accordingly.`
         } else {
-          lastMessage = reply
+          lastMessageRef.current = reply
         }
-        currentTurn = currentTurn === 'A' ? 'B' : 'A'
+        currentTurnRef.current = turn === 'A' ? 'B' : 'A'
       }
     } catch (err) {
       setError(err.message)
     } finally {
+      elapsedBeforePauseRef.current += Date.now() - startTimeRef.current
       setRunning(false)
       setSpeaking(null)
+      if (!stopRef.current) {
+        // Finished naturally (time limit) — not paused
+        setPaused(false)
+      }
     }
   }
 
-  const stop = () => {
+  const pause = () => {
     stopRef.current = true
+    setPaused(true)
     pauseDebateRef.current = false
     recognitionRef.current?.abort()
     try { if (currentAudioRef.current) currentAudioRef.current.stop() } catch {}
     setSpeaking(null)
+  }
+
+  const handleDividerMouseDown = (e) => {
+    e.preventDefault()
+    isDraggingRef.current = true
+    setDraggingSplit(true)
+    const onMouseMove = (ev) => {
+      if (!isDraggingRef.current || !mainAreaRef.current) return
+      const rect = mainAreaRef.current.getBoundingClientRect()
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100
+      setSplitPercent(Math.min(Math.max(pct, 20), 80))
+    }
+    const onMouseUp = () => {
+      isDraggingRef.current = false
+      setDraggingSplit(false)
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
   }
 
   const reset = () => {
@@ -535,9 +609,16 @@ export default function GeminiSelfChatAudio() {
     setLastMessages({ A: '', B: '' })
     setAvatarImages({ A: null, B: null })
     setAvatarLoading({ A: false, B: false })
+    setPaused(false)
+    setElapsed(0)
     pauseDebateRef.current = false
     userInterruptRef.current = null
     startTimeRef.current = null
+    historyARef.current = []
+    historyBRef.current = []
+    lastMessageRef.current = ''
+    currentTurnRef.current = 'A'
+    elapsedBeforePauseRef.current = 0
     recognitionRef.current?.abort()
     setListening(false)
     setInterimText('')
@@ -556,7 +637,7 @@ export default function GeminiSelfChatAudio() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-3">
+    <div className={`h-full flex flex-col gap-3 ${draggingSplit ? 'dragging-split' : ''}`}>
       <style>{`
         @keyframes soundBar {
           from { transform: scaleY(0.3); }
@@ -574,6 +655,7 @@ export default function GeminiSelfChatAudio() {
           from { transform: scaleY(0.2); opacity: 0.3; }
           to   { transform: scaleY(1);   opacity: 0.7; }
         }
+        .dragging-split * { user-select: none !important; cursor: col-resize !important; }
       `}</style>
 
       {/* Avatar stage */}
@@ -638,10 +720,10 @@ export default function GeminiSelfChatAudio() {
       </div>
 
       {/* Main area — fills remaining height */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex min-h-0" ref={mainAreaRef}>
 
         {/* Left: controls + transcript */}
-        <div className="w-[840px] shrink-0 bg-gray-900 rounded-xl p-4 flex flex-col gap-3 min-h-0">
+        <div style={{ width: `${splitPercent}%` }} className="shrink-0 bg-gray-900 rounded-xl p-4 flex flex-col gap-3 min-h-0">
           <div className="flex gap-2 shrink-0">
             {/* Type / Voice toggle */}
             <button
@@ -686,6 +768,13 @@ export default function GeminiSelfChatAudio() {
                 <span className="text-gray-600">/</span>
                 <span className="text-gray-500 font-mono">60:00</span>
               </div>
+            ) : paused ? (
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 border border-yellow-700 rounded-xl text-sm shrink-0">
+                <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
+                <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
+                <span className="text-gray-600">/</span>
+                <span className="text-gray-500 font-mono">60:00</span>
+              </div>
             ) : (
               <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-sm shrink-0 text-gray-500">
                 <span>⏱</span>
@@ -706,16 +795,27 @@ export default function GeminiSelfChatAudio() {
             >
               🖼️
             </button>
-            {running ? (
-              <button onClick={stop} className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0">
-                Stop
-              </button>
-            ) : (
-              <button onClick={start} disabled={!topic.trim()} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0">
-                Start
+            {!running && !paused && (
+              <button
+                onClick={randomise}
+                disabled={randomising}
+                title="Randomise characters and topic"
+                className="px-3 py-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0"
+              >
+                {randomising ? '⏳' : '🎲'}
               </button>
             )}
-            {messages.length > 0 && !running && (
+            {running ? (
+              <button onClick={pause} className="px-4 py-2 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0">
+                Pause
+              </button>
+            ) : (
+              <button onClick={start} disabled={!topic.trim()} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40
+                ${paused ? 'bg-green-700 hover:bg-green-600' : 'bg-indigo-600 hover:bg-indigo-500'}`}>
+                {paused ? 'Resume' : 'Start'}
+              </button>
+            )}
+            {(messages.length > 0 || paused) && !running && (
               <button onClick={reset} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl text-sm transition-colors cursor-pointer shrink-0">
                 Reset
               </button>
@@ -766,6 +866,15 @@ export default function GeminiSelfChatAudio() {
           )}
 
           {error && <p className="text-red-400 text-xs shrink-0">{error}</p>}
+        </div>
+
+        {/* Drag divider */}
+        <div
+          className="flex items-center justify-center cursor-col-resize shrink-0 select-none group px-1"
+          style={{ width: '12px' }}
+          onMouseDown={handleDividerMouseDown}
+        >
+          <div className="w-1 h-full rounded-full bg-gray-700 group-hover:bg-indigo-500 transition-colors duration-150" />
         </div>
 
         {/* Right: image panel — fills all remaining space */}
