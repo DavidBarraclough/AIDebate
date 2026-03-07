@@ -89,9 +89,9 @@ function pcmToWav(pcmBase64, sampleRate = 24000) {
 const TTS_VOICES = { A: 'Puck', B: 'Kore' }
 
 app.post('/api/tts', async (req, res) => {
-  const { text, persona } = req.body
+  const { text, persona, voice: requestedVoice } = req.body
   const apiKey = process.env.GEMINI_API_KEY
-  const voice = TTS_VOICES[persona] || 'Puck'
+  const voice = requestedVoice || TTS_VOICES[persona] || 'Puck'
 
   try {
     const response = await fetch(
@@ -111,23 +111,27 @@ app.post('/api/tts', async (req, res) => {
       }
     )
     const data = await response.json()
-    console.log('TTS response status:', response.status)
-    console.log('TTS data keys:', Object.keys(data))
-    if (data.error) throw new Error(data.error.message)
+    if (data.error) {
+      // If the voice name was invalid, retry with fallback voice
+      if (requestedVoice && data.error.message?.includes('generate text')) {
+        console.warn(`TTS: voice "${requestedVoice}" rejected, falling back to ${TTS_VOICES[persona] || 'Puck'}`)
+        return res.status(400).json({ error: `Voice "${requestedVoice}" is not available. Please choose another.` })
+      }
+      throw new Error(data.error.message)
+    }
     const audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData
-    console.log('Audio mimeType:', audio?.mimeType, 'data length:', audio?.data?.length)
     if (!audio) throw new Error('No audio returned')
     const wavBase64 = pcmToWav(audio.data)
     res.json({ audioContent: wavBase64, mimeType: 'audio/wav' })
   } catch (err) {
-    console.error(err)
+    console.error('TTS error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// Imagen 4 image generation
+// Image generation via Imagen 4 Fast
 app.post('/api/image', async (req, res) => {
-  const { prompt } = req.body
+  const { prompt, aspectRatio = '16:9' } = req.body
   const apiKey = process.env.GEMINI_API_KEY
 
   try {
@@ -138,20 +142,50 @@ app.post('/api/image', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           instances: [{ prompt }],
-          parameters: { sampleCount: 1, aspectRatio: '16:9' },
+          parameters: { sampleCount: 1, aspectRatio },
         }),
       }
     )
     const data = await response.json()
-    console.log('Imagen response:', JSON.stringify(data).slice(0, 500))
     if (data.error) throw new Error(data.error.message)
-    const imageData = data.predictions?.[0]?.bytesBase64Encoded
-    const mimeType = data.predictions?.[0]?.mimeType || 'image/jpeg'
-    if (!imageData) throw new Error('No image returned')
-    res.json({ imageData, mimeType })
+    const pred = data.predictions?.[0]
+    if (!pred?.bytesBase64Encoded) {
+      console.error('Imagen: unexpected response:', JSON.stringify(data).slice(0, 400))
+      throw new Error('No image returned')
+    }
+    res.json({ imageData: pred.bytesBase64Encoded, mimeType: pred.mimeType || 'image/jpeg' })
   } catch (err) {
     console.error('Image error:', err.message)
     res.status(500).json({ error: err.message })
+  }
+})
+
+// Classify a user interrupt — is it a personality update or just a topic redirect?
+app.post('/api/classify-interrupt', async (req, res) => {
+  const { text } = req.body
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const result = await model.generateContent(
+      `A human moderator interrupted an AI debate and said: "${text}"
+
+Reply ONLY with valid JSON (no markdown, no explanation):
+{"isPersonalityUpdate":false,"target":null,"newPersonality":null}
+
+Rules:
+- "isPersonalityUpdate": true if the user is defining, changing, or describing the character/personality/style/role of one or both AIs
+- "target": "A" (first AI), "B" (second AI), "both", or null if not a personality update
+- "newPersonality": a concise personality description extracted from the message, or null
+
+Examples:
+"make A more aggressive" → {"isPersonalityUpdate":true,"target":"A","newPersonality":"aggressive and confrontational"}
+"B should be a philosopher" → {"isPersonalityUpdate":true,"target":"B","newPersonality":"philosophical and reflective"}
+"talk about climate change" → {"isPersonalityUpdate":false,"target":null,"newPersonality":null}`
+    )
+    const raw = result.response.text().trim().replace(/```json?|```/g, '').trim()
+    res.json(JSON.parse(raw))
+  } catch (err) {
+    console.error('classify-interrupt error:', err.message)
+    res.json({ isPersonalityUpdate: false, target: null, newPersonality: null })
   }
 })
 
