@@ -6,6 +6,7 @@ import 'dotenv/config'
 const app = express()
 app.use(cors())
 app.use(express.json())
+app.use((req, _res, next) => { console.log(req.method, req.path); next() })
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 
@@ -186,6 +187,39 @@ Examples:
   } catch (err) {
     console.error('classify-interrupt error:', err.message)
     res.json({ isPersonalityUpdate: false, target: null, newPersonality: null })
+  }
+})
+
+app.post('/api/generate-setup', async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY
+  const prompt = `Generate a creative AI debate setup. Reply with ONLY a JSON object — no markdown, no explanation, just raw JSON.
+
+Example: {"A":{"name":"Cassandra","personality":"doom-obsessed and dramatically prophetic","gender":"female"},"B":{"name":"Rex","personality":"stubbornly optimistic and infuriatingly cheerful","gender":"male"},"topic":"Is humanity doomed or just getting started?"}
+
+Rules: names match gender, vivid dramatic contrast between characters, topic suits them specifically (max 12 words), personalities 4-7 specific words. Archetypes: hero vs villain, parent vs child, scientist vs mystic, optimist vs pessimist, rebel vs authority, logic vs emotion. Be surprising and creative each time.`
+  console.log('generate-setup: start')
+  try {
+    console.log('generate-setup: fetching')
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }),
+      }
+    )
+    console.log('generate-setup: response status', response.status)
+    const rawText = await response.text()
+    console.log('generate-setup: raw response', rawText.substring(0, 300))
+    const data = JSON.parse(rawText)
+    if (data.error) throw new Error(data.error.message)
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim()
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) throw new Error('No JSON in response: ' + text)
+    res.json(JSON.parse(match[0]))
+  } catch (err) {
+    console.error('generate-setup error:', err.message)
+    res.status(500).json({ error: err.message })
   }
 })
 
