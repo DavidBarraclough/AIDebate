@@ -8,12 +8,51 @@ app.use(cors())
 app.use(express.json())
 app.use((req, _res, next) => { console.log(req.method, req.path); next() })
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+const HEADER_API_KEY = 'x-gemini-api-key'
+
+function resolveGeminiApiKey(req) {
+  const headerKey = (req.get(HEADER_API_KEY) || '').trim()
+  const envKey = (process.env.GEMINI_API_KEY || '').trim()
+  return headerKey || envKey || null
+}
+
+function requireGeminiApiKey(req, res) {
+  const apiKey = resolveGeminiApiKey(req)
+  if (!apiKey) {
+    res.status(400).json({ error: 'Gemini API key missing. Add your personal key in the app or configure GEMINI_API_KEY on the server.' })
+    return null
+  }
+  return apiKey
+}
+
+app.post('/api/test-key', async (req, res) => {
+  const apiKey = requireGeminiApiKey(req, res)
+  if (!apiKey) return
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
+    const data = await response.json()
+
+    if (!response.ok || data.error) {
+      const msg = data?.error?.message || 'API key validation failed.'
+      const status = response.status === 401 || response.status === 403 ? 401 : 400
+      return res.status(status).json({ valid: false, error: msg })
+    }
+
+    return res.json({ valid: true })
+  } catch (err) {
+    console.error('test-key error:', err.message)
+    return res.status(500).json({ valid: false, error: 'Unable to validate key right now.' })
+  }
+})
 
 app.post('/api/chat', async (req, res) => {
   const { history, message } = req.body
+  const apiKey = requireGeminiApiKey(req, res)
+  if (!apiKey) return
 
   try {
+    const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
 
     const chat = model.startChat({
@@ -36,8 +75,11 @@ app.post('/api/chat', async (req, res) => {
 // One turn in a self-chat — each side has its own system prompt + history
 app.post('/api/self-chat-turn', async (req, res) => {
   const { systemPrompt, history, message } = req.body
+  const apiKey = requireGeminiApiKey(req, res)
+  if (!apiKey) return
 
   try {
+    const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash-lite',
       systemInstruction: systemPrompt,
@@ -91,7 +133,8 @@ const TTS_VOICES = { A: 'Puck', B: 'Kore' }
 
 app.post('/api/tts', async (req, res) => {
   const { text, persona, voice: requestedVoice } = req.body
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = requireGeminiApiKey(req, res)
+  if (!apiKey) return
   const voice = requestedVoice || TTS_VOICES[persona] || 'Puck'
 
   try {
@@ -139,7 +182,8 @@ app.post('/api/tts', async (req, res) => {
 // Image generation via Imagen 4 Fast
 app.post('/api/image', async (req, res) => {
   const { prompt, aspectRatio = '16:9' } = req.body
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = requireGeminiApiKey(req, res)
+  if (!apiKey) return
 
   try {
     const response = await fetch(
@@ -170,7 +214,12 @@ app.post('/api/image', async (req, res) => {
 // Classify a user interrupt — is it a personality update or just a topic redirect?
 app.post('/api/classify-interrupt', async (req, res) => {
   const { text } = req.body
+  const apiKey = resolveGeminiApiKey(req)
+  if (!apiKey) {
+    return res.json({ isPersonalityUpdate: false, target: null, newPersonality: null })
+  }
   try {
+    const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
     const result = await model.generateContent(
       `A human moderator interrupted an AI debate and said: "${text}"
@@ -197,7 +246,8 @@ Examples:
 })
 
 app.post('/api/generate-setup', async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY
+  const apiKey = requireGeminiApiKey(req, res)
+  if (!apiKey) return
   const category = req.body?.category || 'wild-card'
   const style = req.body?.style || 'ai'
 
@@ -341,7 +391,10 @@ Rules: names match gender and fit the category theme, vivid dramatic contrast be
 
 app.post('/api/debate-summary', async (req, res) => {
   const { transcript, nameA, nameB, topic } = req.body
+  const apiKey = requireGeminiApiKey(req, res)
+  if (!apiKey) return
   try {
+    const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
     const prompt = `You are a debate analyst. Analyze this debate between ${nameA} and ${nameB} on: "${topic}".
 

@@ -278,13 +278,17 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, name, onNa
 }
 
 // Fetch TTS audio data from server (can be prefetched)
-async function fetchTTS(text, personaKey, voice, postJson) {
+async function fetchTTS(text, personaKey, voice, postJson, userApiKey = '') {
   if (postJson) {
     return await postJson('tts', { text, persona: personaKey, voice })
   }
+  const trimmedKey = String(userApiKey || '').trim()
   const res = await fetch(`${API_BASE_URL}/api/tts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(trimmedKey ? { 'x-gemini-api-key': trimmedKey } : {}),
+    },
     body: JSON.stringify({ text, persona: personaKey, voice }),
   })
   return await res.json()
@@ -727,7 +731,7 @@ function applyAccentThemeToSetup(styleKey, setup) {
   }
 }
 
-export default function GeminiSelfChatAudio() {
+export default function GeminiSelfChatAudio({ userApiKey = '' }) {
   const [topic, setTopic] = useState('')
   const [inputMode, setInputMode] = useState('voice') // 'type' | 'voice'
   const [messages, setMessages] = useState([])
@@ -825,9 +829,13 @@ export default function GeminiSelfChatAudio() {
 
   const postJson = async (endpoint, payload) => {
     try {
+      const trimmedKey = userApiKey.trim()
       const res = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(trimmedKey ? { 'x-gemini-api-key': trimmedKey } : {}),
+        },
         body: JSON.stringify(payload),
       })
       trackApiResult(endpoint, res.ok)
@@ -1890,7 +1898,7 @@ export default function GeminiSelfChatAudio() {
           {/* Session telemetry */}
           <div className="shrink-0 rounded-xl bg-gray-800/70 border border-gray-700/70 px-4 py-3">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-gray-400">
-              <span>Est. cost: <span className="font-semibold text-gray-100">~${estimatedSessionCost.toFixed(2)} USD</span></span>
+              <span>Session est. cost: <span className="font-semibold text-gray-100">~${estimatedSessionCost.toFixed(2)} USD</span></span>
               <span>Calls: <span className="font-semibold text-gray-100">{totalApiCalls}</span></span>
               <span>Turns: <span className="font-semibold text-gray-100">{usageTextTurns}</span></span>
               <span>Voice: <span className="font-semibold text-gray-100">{usageVoiceGenerations}</span></span>
