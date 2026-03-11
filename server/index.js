@@ -199,7 +199,7 @@ Examples:
 app.post('/api/generate-setup', async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY
   const category = req.body?.category || 'wild-card'
-  const style = req.body?.style || 'normal'
+  const style = req.body?.style || 'ai'
 
   const categoryPrompts = {
     'comedy': `Category: COMEDY. Generate hilarious, absurd, over-the-top characters. Think slapstick, satire, ridiculous premises. Names should be funny or punny.
@@ -236,6 +236,12 @@ Example: {"A":{"name":"Cassandra","personality":"doom-obsessed and dramatically 
   const categoryGuide = categoryPrompts[category] || categoryPrompts['wild-card']
 
   const styleGuides = {
+    ai: `Style context: AI FUTURE mode.
+Rules:
+- Names should feel synthetic, machine-like, or post-human.
+- Topic should focus on humanity's future under dominant AI systems.
+- Personalities should be archetypal superintelligence personas (for example: AI sovereign, rogue alignment model, post-human strategist).
+- Keep tone unsettling, futuristic, and high-stakes.`,
     rhyme: `Style context: RHYME BATTLE mode.
   Rules:
   - Names should sound lyrical, poetic, or spoken-word themed.

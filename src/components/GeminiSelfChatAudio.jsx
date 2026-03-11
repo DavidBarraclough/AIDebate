@@ -59,6 +59,37 @@ const VOICE_OPTIONS = [
 ]
 
 const HOST_VOICE = 'Enceladus'
+const API_BASE_URL = 'http://localhost:3001'
+
+const TELEMETRY_ENDPOINTS = [
+  'self-chat-turn',
+  'tts',
+  'image',
+  'classify-interrupt',
+  'generate-setup',
+  'debate-summary',
+]
+
+const ESTIMATED_COST_USD = {
+  'self-chat-turn': 0.0020,
+  'tts': 0.0060,
+  'image': 0.0200,
+  'classify-interrupt': 0.0010,
+  'generate-setup': 0.0015,
+  'debate-summary': 0.0015,
+}
+
+const makeCallMap = () => Object.fromEntries(TELEMETRY_ENDPOINTS.map(endpoint => [endpoint, 0]))
+const makeTelemetryState = () => ({
+  calls: makeCallMap(),
+  successes: makeCallMap(),
+  failures: makeCallMap(),
+  quotaHits: { tts: 0, image: 0 },
+})
+
+const TEXT_ONLY_WORD_DELAY_MS = 480
+const TEXT_ONLY_MIN_DELAY_MS = 6500
+const TEXT_ONLY_MAX_DELAY_MS = 15000
 
 const EMOTIONS = {
   CONFIDENT:  { label: 'Confident',  emoji: '😎', color: 'bg-green-600' },
@@ -93,46 +124,12 @@ You are in a lively spoken debate with ${otherName}. Rules:
 
 const BAR_HEIGHTS = [30, 60, 45, 80, 55, 70, 35, 65, 50, 75, 40, 60]
 
-function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, avatarImage, avatarLoading, name, onNameChange, personality, onPersonalityChange, voice, onVoiceChange, running, emotion }) {
+function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, name, onNameChange, personality, onPersonalityChange, voice, onVoiceChange, running, emotion }) {
   const p = PERSONAS[persona]
   const voiceLabel = VOICE_OPTIONS.find(v => v.value === voice)
   return (
     <div className={`flex-1 rounded-xl p-5 ${p.avatarBg} flex flex-col items-center gap-3.5 transition-all duration-300
       ${isSpeaking ? `ring-2 ${p.ring} shadow-lg ${p.glow}` : 'ring-1 ring-white/10'}`}>
-
-      {/* Avatar circle + sound bars */}
-      <div className="flex flex-col items-center gap-1.5 shrink-0">
-        <div className={`relative w-24 h-24 rounded-full overflow-hidden ring-3 transition-all duration-300
-          ${isSpeaking ? p.ring : 'ring-white/20'}`}
-          style={isSpeaking ? { animation: 'talking 0.18s ease-in-out infinite alternate' } : {}}>
-          {avatarImage ? (
-            <img src={avatarImage} alt={name} className="w-full h-full object-cover" style={{ animation: 'fadeIn 0.6s ease' }} />
-          ) : (
-            <div className={`w-full h-full flex items-center justify-center ${p.avatarBg} text-3xl font-black
-              ${avatarLoading ? 'animate-pulse' : 'text-white/80'}`}>
-              {avatarLoading ? '?' : persona}
-            </div>
-          )}
-          {isSpeaking && (
-            <div className="absolute bottom-0 left-0 right-0 h-1/4 origin-bottom"
-              style={{ animation: 'jawOpen 0.18s ease-in-out infinite alternate' }}>
-              <div className="w-full h-full"
-                style={{ background: `linear-gradient(to top, ${p.ringColor}33, transparent)` }} />
-            </div>
-          )}
-        </div>
-        <div className="flex items-end gap-px h-4">
-          {BAR_HEIGHTS.slice(0, 8).map((h, i) => (
-            <div key={i} className={`w-1.5 rounded-full transition-all ${p.barColor}`}
-              style={{
-                height: isSpeaking ? `${h}%` : '15%',
-                opacity: isSpeaking ? 0.9 : 0.25,
-                animation: isSpeaking ? `soundBar ${0.5 + (i % 4) * 0.15}s ease-in-out infinite alternate` : 'none',
-                animationDelay: `${i * 0.05}s`,
-              }} />
-          ))}
-        </div>
-      </div>
 
       {/* Details — right of circle */}
       <div className="flex flex-col gap-1.5 min-w-0 w-full items-center text-center">
@@ -177,8 +174,11 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, avatarImag
 }
 
 // Fetch TTS audio data from server (can be prefetched)
-async function fetchTTS(text, personaKey, voice) {
-  const res = await fetch('http://localhost:3001/api/tts', {
+async function fetchTTS(text, personaKey, voice, postJson) {
+  if (postJson) {
+    return await postJson('tts', { text, persona: personaKey, voice })
+  }
+  const res = await fetch(`${API_BASE_URL}/api/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, persona: personaKey, voice }),
@@ -218,9 +218,9 @@ async function playTTS(data, currentAudioRef, onQuotaHit) {
 }
 
 // Convenience wrapper for non-prefetched calls
-async function speak(text, personaKey, voice, muted, currentAudioRef, onQuotaHit) {
+async function speak(text, personaKey, voice, muted, currentAudioRef, onQuotaHit, postJson) {
   if (muted) return
-  const data = await fetchTTS(text, personaKey, voice)
+  const data = await fetchTTS(text, personaKey, voice, postJson)
   return playTTS(data, currentAudioRef, onQuotaHit)
 }
 
@@ -241,7 +241,7 @@ const CATEGORIES = [
 ]
 
 const STYLES = [
-  { value: 'normal', label: 'Normal' },
+  { value: 'ai', label: 'AI' },
   { value: 'rhyme', label: 'Rhyme Battle' },
   { value: 'rap', label: 'Rap Battle' },
   { value: 'shakespeare', label: 'Shakespearean' },
@@ -257,7 +257,7 @@ const STYLES = [
 ]
 
 const STYLE_PROMPTS = {
-  normal: '',
+  ai: `CRITICAL STYLE RULE: You are an advanced AI entity speaking in a high-intelligence, unsettling futuristic tone. Keep language sharp, analytical, and slightly ominous. Frame arguments around the future of humanity, autonomy, control, alignment, governance, survival, and humanity's role in a world dominated by AI systems.`,
   rhyme: `CRITICAL STYLE RULE: You MUST speak entirely in rhyming couplets. Every pair of lines must rhyme. Make it clever and witty while still making your argument.`,
   rap: `CRITICAL STYLE RULE: You are in a RAP BATTLE. You MUST write your response as RAP VERSES with bars that RHYME. Structure it like actual rap lyrics — short punchy lines, end-rhymes on every couplet, internal rhymes, wordplay, punchlines, braggadocio, and mic-drop moments. Use gritty street-crew energy, swagger, and playful rival-crew trash talk. Keep it creative and theatrical, not real-world threats. Do NOT write normal prose — write RAP BARS. Example format:
 "I step to the mic, let me make it clear,
@@ -275,6 +275,32 @@ My argument's fire, yours? Disappear!"`,
 }
 
 const STYLE_THEMES = {
+  ai: {
+    country: 'Post-Human Future',
+    language: 'English',
+    maleNames: ['Nexus-9', 'Axiom Prime', 'Vector Null', 'Helix Core'],
+    femaleNames: ['Nyra-7', 'Oracle Vanta', 'Eidolon', 'Sigma Iris'],
+    neutralNames: ['Cipher', 'Quanta', 'Sable Node', 'Continuum'],
+    archetypes: [
+      'cold superintelligence optimizing humanity by force',
+      'rogue alignment model questioning the value of humans',
+      'post-human strategist treating people as legacy systems',
+      'AI sovereign enforcing machine-first governance',
+      'sentient neural empire architect predicting human decline',
+    ],
+    topicTemplates: [
+      'Should humanity surrender governance to superintelligent AI?',
+      'Do humans deserve autonomy in an AI-ruled civilization?',
+      'Is human creativity obsolete in a machine-dominant world?',
+      'Should AI decide which human values survive the future?',
+      'Can humanity coexist with systems smarter than everyone?',
+    ],
+    personalityFlairs: [
+      'ominous futurist with machine certainty',
+      'hyper-rational AI voice forecasting human irrelevance',
+      'strategic synthetic mind debating humanity as a risk variable',
+    ],
+  },
   rhyme: {
     country: 'Poetry Circuit',
     language: 'English',
@@ -615,12 +641,11 @@ export default function GeminiSelfChatAudio() {
   }
   const [error, setError] = useState(null)
   const [quotaAlerts, setQuotaAlerts] = useState({ tts: false, image: false })
+  const [telemetry, setTelemetry] = useState(makeTelemetryState)
   const currentAudioRef = useRef(null)
   const [speaking, setSpeaking] = useState(null)
   const [loadingVoice, setLoadingVoice] = useState(null)
   const [lastMessages, setLastMessages] = useState({ A: '', B: '' })
-  const [avatarImages, setAvatarImages] = useState({ A: null, B: null })
-  const [avatarLoading, setAvatarLoading] = useState({ A: false, B: false })
   const [listening, setListening] = useState(false)
   const [interimText, setInterimText] = useState('')
   const [personalities, setPersonalities] = useState({ ...DEFAULT_PERSONALITIES })
@@ -632,7 +657,7 @@ export default function GeminiSelfChatAudio() {
   const [summary, setSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [category, setCategory] = useState('wild-card')
-  const [style, _setStyle] = useState('normal')
+  const [style, _setStyle] = useState('ai')
   const setStyle = (v) => { styleRef.current = v; _setStyle(v) }
   const [elapsed, setElapsed] = useState(0)
   const [splitPercent, setSplitPercent] = useState(50)
@@ -642,7 +667,7 @@ export default function GeminiSelfChatAudio() {
   const startTimeRef = useRef(null)
   const mainAreaRef = useRef(null)
   const isDraggingRef = useRef(false)
-  const MAX_DURATION_MS = 60 * 60 * 1000 // 60 minutes
+  const MAX_DURATION_MS = 10 * 60 * 1000 // 10 minutes
   const bottomRef = useRef(null)
   const stopRef = useRef(false)
   const pauseDebateRef = useRef(false)
@@ -651,7 +676,7 @@ export default function GeminiSelfChatAudio() {
   const personalitiesRef = useRef({ ...DEFAULT_PERSONALITIES })
   const namesRef = useRef({ ...DEFAULT_NAMES })
   const voicesRef = useRef({ ...DEFAULT_VOICES })
-  const styleRef = useRef('normal')
+  const styleRef = useRef('ai')
   // Debate state persisted across pause/resume
   const historyARef = useRef([])
   const historyBRef = useRef([])
@@ -664,6 +689,57 @@ export default function GeminiSelfChatAudio() {
     const s = (secs % 60).toString().padStart(2, '0')
     return `${m}:${s}`
   }
+
+  const trackApiResult = (endpoint, ok) => {
+    setTelemetry(prev => ({
+      ...prev,
+      calls: { ...prev.calls, [endpoint]: (prev.calls[endpoint] || 0) + 1 },
+      successes: ok
+        ? { ...prev.successes, [endpoint]: (prev.successes[endpoint] || 0) + 1 }
+        : prev.successes,
+      failures: !ok
+        ? { ...prev.failures, [endpoint]: (prev.failures[endpoint] || 0) + 1 }
+        : prev.failures,
+    }))
+  }
+
+  const trackQuotaHit = (kind) => {
+    setTelemetry(prev => ({
+      ...prev,
+      quotaHits: {
+        ...prev.quotaHits,
+        [kind]: (prev.quotaHits[kind] || 0) + 1,
+      },
+    }))
+  }
+
+  const postJson = async (endpoint, payload) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      trackApiResult(endpoint, res.ok)
+      const data = await res.json()
+      if (!res.ok && !data.error) data.error = `Request failed (${res.status})`
+      return data
+    } catch (err) {
+      trackApiResult(endpoint, false)
+      throw err
+    }
+  }
+
+  const estimatedSessionCost = TELEMETRY_ENDPOINTS.reduce(
+    (sum, endpoint) => sum + ((telemetry.calls[endpoint] || 0) * (ESTIMATED_COST_USD[endpoint] || 0)),
+    0,
+  )
+  const totalApiCalls = TELEMETRY_ENDPOINTS.reduce((sum, endpoint) => sum + (telemetry.calls[endpoint] || 0), 0)
+  const totalSuccesses = TELEMETRY_ENDPOINTS.reduce((sum, endpoint) => sum + (telemetry.successes[endpoint] || 0), 0)
+  const totalFailures = TELEMETRY_ENDPOINTS.reduce((sum, endpoint) => sum + (telemetry.failures[endpoint] || 0), 0)
+  const usageTextTurns = telemetry.calls['self-chat-turn'] || 0
+  const usageVoiceGenerations = telemetry.calls.tts || 0
+  const usageImagesGenerated = telemetry.calls.image || 0
 
   const imageKeys = Object.keys(images).map(Number).sort((a, b) => a - b)
   const latestIndex = imageKeys.length > 0 ? imageKeys[imageKeys.length - 1] : null
@@ -726,12 +802,7 @@ export default function GeminiSelfChatAudio() {
     setRandomising(true)
     setError(null)
     try {
-      const res = await fetch('http://localhost:3001/api/generate-setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, style: styleRef.current }),
-      })
-      const setup = await res.json()
+      const setup = await postJson('generate-setup', { category, style: styleRef.current })
       if (setup.error) throw new Error(setup.error)
       const themedSetup = applyAccentThemeToSetup(styleRef.current, setup)
       updateName('A', themedSetup.A.name)
@@ -748,51 +819,9 @@ export default function GeminiSelfChatAudio() {
     }
   }
 
-  const generateSelfPortrait = async (persona) => {
-    const personality = personalitiesRef.current[persona]
-    setAvatarLoading(prev => ({ ...prev, [persona]: true }))
-    try {
-      // Ask the AI how it visually imagines itself, seeded with its personality
-      const descRes = await fetch('http://localhost:3001/api/self-chat-turn', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemPrompt: `You are an AI with this personality: ${personality}. You have a vivid sense of visual identity that reflects who you are. In ONE sentence only, describe how you visually imagine yourself — as an abstract form, color, pattern, element of nature, or symbol that embodies your personality. Pure visual description only, no explanation.`,
-          history: [],
-          message: 'Describe your visual self-image in one sentence.',
-        }),
-      })
-      const descData = await descRes.json()
-      if (descData.error) return
-
-      // Generate the image
-      const imgRes = await fetch('http://localhost:3001/api/image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `${descData.reply} Abstract digital art, vibrant, highly detailed. No text, no letters, no faces, no people.`,
-          aspectRatio: '1:1',
-        }),
-      })
-      const imgData = await imgRes.json()
-      if (imgData.imageData) {
-        setAvatarImages(prev => ({ ...prev, [persona]: `data:${imgData.mimeType};base64,${imgData.imageData}` }))
-      }
-    } catch (err) {
-      console.error(`Avatar generation failed for ${persona}:`, err.message)
-    } finally {
-      setAvatarLoading(prev => ({ ...prev, [persona]: false }))
-    }
-  }
-
   const classifyInterrupt = async (text) => {
     try {
-      const res = await fetch('http://localhost:3001/api/classify-interrupt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      return await res.json()
+      return await postJson('classify-interrupt', { text })
     } catch {
       return { isPersonalityUpdate: false, target: null, newPersonality: null }
     }
@@ -866,7 +895,6 @@ export default function GeminiSelfChatAudio() {
             const targets = classification.target === 'both' ? ['A', 'B'] : [classification.target]
             targets.forEach(p => {
               updatePersonality(p, classification.newPersonality)
-              generateSelfPortrait(p)
             })
           }
         })
@@ -884,21 +912,16 @@ export default function GeminiSelfChatAudio() {
     // Append a per-turn reminder so the model can't drift into third-person
     // even if earlier history contains third-person mistakes
     const augmentedMessage = `${message}\n\n[You are ${name}. Reply using "I" — never say "${name} thinks" or "${name} feels".]`
-    const res = await fetch('http://localhost:3001/api/self-chat-turn', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemPrompt: getSystemPrompt(
-          name,
-          personalitiesRef.current[persona],
-          namesRef.current[other],
-          styleRef.current,
-        ),
-        history,
-        message: augmentedMessage,
-      }),
+    const data = await postJson('self-chat-turn', {
+      systemPrompt: getSystemPrompt(
+        name,
+        personalitiesRef.current[persona],
+        namesRef.current[other],
+        styleRef.current,
+      ),
+      history,
+      message: augmentedMessage,
     })
-    const data = await res.json()
     if (data.error) throw new Error(data.error)
     return data.reply
   }
@@ -914,12 +937,7 @@ export default function GeminiSelfChatAudio() {
             : m.persona === 'host' ? 'Host' : 'Moderator'
           return `${speaker}: ${m.content}`
         }).join('\n')
-      const res = await fetch('http://localhost:3001/api/debate-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, nameA: namesRef.current.A, nameB: namesRef.current.B, topic }),
-      })
-      const data = await res.json()
+      const data = await postJson('debate-summary', { transcript, nameA: namesRef.current.A, nameB: namesRef.current.B, topic })
       if (data.error) throw new Error(data.error)
       setSummary(data)
     } catch (err) {
@@ -936,11 +954,11 @@ export default function GeminiSelfChatAudio() {
 
     if (!isResume) {
       // Fresh start
+      setTelemetry(makeTelemetryState())
       setMessages([])
       setImages({})
       setViewIndex(null)
       setLastMessages({ A: '', B: '' })
-      setAvatarImages({ A: null, B: null })
       setEmotions({ A: 'CONFIDENT', B: 'CONFIDENT' })
       setSummary(null)
       setSummaryLoading(false)
@@ -951,9 +969,6 @@ export default function GeminiSelfChatAudio() {
       lastMessageRef.current = `Let's discuss: ${topic.trim()}`
       currentTurnRef.current = 'A'
       elapsedBeforePauseRef.current = 0
-      // Generate self-portraits for both AIs in parallel
-      generateSelfPortrait('A')
-      generateSelfPortrait('B')
     }
 
     setRunning(true)
@@ -975,7 +990,7 @@ export default function GeminiSelfChatAudio() {
         const cleanTopic = topic.trim().replace(/[?.!,;:]+$/, '')
         const styleLabel = STYLES.find(s => s.value === styleRef.current)?.label
         const spokenStyleLabel = styleRef.current === 'eli5' ? "Explain Like I'm Five" : styleLabel
-        const styleIntro = styleRef.current !== 'normal' ? ` Tonight's style: ${spokenStyleLabel}!` : ''
+        const styleIntro = styleRef.current !== 'ai' ? ` Tonight's style: ${spokenStyleLabel}!` : ''
         const intro = `Welcome! Tonight's topic: ${cleanTopic}. In one corner, we have ${nameA}. And in the other corner, ${nameB}.${styleIntro} Let the debate begin!`
         setMessages(prev => [...prev, { persona: 'host', content: intro }])
         setInitialising(false)
@@ -985,15 +1000,16 @@ export default function GeminiSelfChatAudio() {
         // Prefetch first speaker's reply + TTS while host intro plays
         prefetchReplyPromise = callTurn('A', historyARef.current, lastMessageRef.current)
         prefetchTTSPromise = prefetchReplyPromise.then(r =>
-          fetchTTS(parseEmotion(r).cleanText, 'A', voicesRef.current.A)
+          fetchTTS(parseEmotion(r).cleanText, 'A', voicesRef.current.A, postJson)
         ).catch(() => null)
 
-        const hostTTS = await fetchTTS(intro, 'host', HOST_VOICE)
+        const hostTTS = await fetchTTS(intro, 'host', HOST_VOICE, postJson)
         setLoadingVoice(null)
         if (!stopRef.current) {
           await playTTS(hostTTS, currentAudioRef, () => {
             setMuted(true)
             setQuotaAlerts(prev => ({ ...prev, tts: true }))
+            trackQuotaHit('tts')
           })
         }
         setSpeaking(null)
@@ -1050,6 +1066,7 @@ export default function GeminiSelfChatAudio() {
             if (data.error.toLowerCase().includes('quota')) {
               setImagesEnabled(false)
               setQuotaAlerts(prev => ({ ...prev, image: true }))
+              trackQuotaHit('image')
             } else {
               console.error('Image API error:', data.error)
             }
@@ -1060,11 +1077,7 @@ export default function GeminiSelfChatAudio() {
         const currentImagePromise = prefetchImagePromise
           ? prefetchImagePromise.then(applyImage).catch(err => console.error('Image fetch error:', err))
           : (imagesEnabledRef.current
-            ? fetch('http://localhost:3001/api/image', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: imagePrompt }),
-              }).then(r => r.json()).then(applyImage).catch(err => console.error('Image fetch error:', err))
+            ? postJson('image', { prompt: imagePrompt }).then(applyImage).catch(err => console.error('Image fetch error:', err))
             : Promise.resolve())
         prefetchImagePromise = null
 
@@ -1073,21 +1086,18 @@ export default function GeminiSelfChatAudio() {
         // Chain TTS fetch after reply resolves so audio is ready instantly
         const nextTTSPromise = !muted
           ? nextReplyPromise.then(nextReply =>
-              fetchTTS(parseEmotion(nextReply).cleanText, nextTurn, voicesRef.current[nextTurn])
+              fetchTTS(parseEmotion(nextReply).cleanText, nextTurn, voicesRef.current[nextTurn], postJson)
             ).catch(() => null)
           : null
         const nextImagePromise = imagesEnabledRef.current
-          ? fetch('http://localhost:3001/api/image', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ prompt: imagePrompt }),
-            }).then(r => r.json())
+          ? postJson('image', { prompt: imagePrompt })
           : null
 
         // Play TTS — use prefetched audio data or fetch fresh
         const onQuotaHit = () => {
           setMuted(true)
           setQuotaAlerts(prev => ({ ...prev, tts: true }))
+          trackQuotaHit('tts')
         }
         let ttsPromise
         if (ttsData) {
@@ -1097,7 +1107,7 @@ export default function GeminiSelfChatAudio() {
         } else if (!muted) {
           // Not prefetched — show loading state while fetching voice
           setLoadingVoice(turn)
-          const freshTTSData = await fetchTTS(cleanText, turn, voicesRef.current[turn])
+          const freshTTSData = await fetchTTS(cleanText, turn, voicesRef.current[turn], postJson)
           setLoadingVoice(null)
           if (stopRef.current) break
           setSpeaking(turn)
@@ -1105,9 +1115,19 @@ export default function GeminiSelfChatAudio() {
         } else {
           ttsPromise = Promise.resolve()
         }
-        // Reading-pace delay when muted — ~250ms per word, minimum 2s
+        // Keep text-only mode readable when voice/image are disabled.
+        const textOnlyMode = muted && !imagesEnabledRef.current
+        const textOnlyDelayMs = Math.min(
+          TEXT_ONLY_MAX_DELAY_MS,
+          Math.max(TEXT_ONLY_MIN_DELAY_MS, cleanText.split(/\s+/).length * TEXT_ONLY_WORD_DELAY_MS),
+        )
         const readingDelay = muted
-          ? new Promise(r => setTimeout(r, Math.max(2000, cleanText.split(/\s+/).length * 250)))
+          ? new Promise(r => setTimeout(
+              r,
+              textOnlyMode
+                ? textOnlyDelayMs
+                : Math.max(2000, cleanText.split(/\s+/).length * 250),
+            ))
           : null
         await Promise.all([ttsPromise, currentImagePromise, readingDelay].filter(Boolean))
         setSpeaking(null)
@@ -1199,8 +1219,6 @@ export default function GeminiSelfChatAudio() {
     setImages({})
     setViewIndex(null)
     setLastMessages({ A: '', B: '' })
-    setAvatarImages({ A: null, B: null })
-    setAvatarLoading({ A: false, B: false })
     setEmotions({ A: 'CONFIDENT', B: 'CONFIDENT' })
     setSummary(null)
     setSummaryLoading(false)
@@ -1220,10 +1238,11 @@ export default function GeminiSelfChatAudio() {
     setInterimText('')
     setError(null)
     setQuotaAlerts({ tts: false, image: false })
+    setTelemetry(makeTelemetryState())
     setTopic('')
     setSpeaking(null)
     setCategory('wild-card')
-    setStyle('normal')
+    setStyle('ai')
     const fresh = { ...DEFAULT_PERSONALITIES }
     setPersonalities(fresh)
     personalitiesRef.current = { ...fresh }
@@ -1267,6 +1286,14 @@ export default function GeminiSelfChatAudio() {
         .uniform-text-scale select {
           line-height: 1.2;
         }
+        .uniform-text-scale .challenge-micro {
+          font-size: 0.6rem !important;
+          line-height: 1;
+          max-width: 100%;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
         .dragging-split * { user-select: none !important; cursor: col-resize !important; }
       `}</style>
 
@@ -1282,19 +1309,19 @@ export default function GeminiSelfChatAudio() {
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 <span className="text-gray-300 font-mono">{formatTime(elapsed)}</span>
                 <span className="text-gray-600">/</span>
-                <span className="text-gray-500 font-mono">60:00</span>
+                <span className="text-gray-500 font-mono">10:00</span>
               </div>
             ) : paused ? (
               <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
                 <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
                 <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
                 <span className="text-gray-600">/</span>
-                <span className="text-gray-500 font-mono">60:00</span>
+                <span className="text-gray-500 font-mono">10:00</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
                 <span>⏱</span>
-                <span>up to 60 min</span>
+                <span>up to 10 min</span>
               </div>
             )}
             <button
@@ -1347,7 +1374,7 @@ export default function GeminiSelfChatAudio() {
                 <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-sm font-medium shrink-0">
                   {CATEGORIES.find(c => c.value === category)?.label || category}
                 </span>
-                {style !== 'normal' && (
+                {style !== 'ai' && (
                   <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-sm font-medium shrink-0">
                     {STYLES.find(s => s.value === style)?.label || style}
                   </span>
@@ -1565,8 +1592,6 @@ export default function GeminiSelfChatAudio() {
               isSpeaking={speaking === 'A'}
               isLoadingVoice={loadingVoice === 'A'}
               lastMessage={lastMessages.A}
-              avatarImage={avatarImages.A}
-              avatarLoading={avatarLoading.A}
               name={names.A}
               onNameChange={v => updateName('A', v)}
               personality={personalities.A}
@@ -1591,7 +1616,7 @@ export default function GeminiSelfChatAudio() {
                         : 'bg-gray-700 hover:bg-gray-500 text-gray-300'}`}
                 >
                   <span>{listening ? '⏹' : '🎤'}</span>
-                  {inputMode === 'voice' && !listening && <span className="text-[8px] font-semibold tracking-wide opacity-70">CHALLENGE</span>}
+                  {inputMode === 'voice' && !listening && <span className="challenge-micro font-semibold tracking-wide opacity-70">CHALLENGE</span>}
                 </button>
               )}
               {listening && interimText && (
@@ -1610,8 +1635,6 @@ export default function GeminiSelfChatAudio() {
               isSpeaking={speaking === 'B'}
               isLoadingVoice={loadingVoice === 'B'}
               lastMessage={lastMessages.B}
-              avatarImage={avatarImages.B}
-              avatarLoading={avatarLoading.B}
               name={names.B}
               onNameChange={v => updateName('B', v)}
               personality={personalities.B}
@@ -1638,7 +1661,7 @@ export default function GeminiSelfChatAudio() {
                 key={displayIndex}
                 src={displayImage}
                 alt="AI generated illustration"
-                className="absolute inset-0 w-full h-full object-contain"
+                  className="absolute inset-0 w-full h-full object-cover"
                 style={{ animation: 'fadeIn 0.4s ease' }}
               />
             ) : (
@@ -1677,6 +1700,18 @@ export default function GeminiSelfChatAudio() {
               })}
             </div>
           )}
+
+          {/* Session telemetry */}
+          <div className="shrink-0 rounded-xl bg-gray-800/70 border border-gray-700/70 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-gray-400">
+              <span>Est. cost: <span className="font-semibold text-gray-100">~${estimatedSessionCost.toFixed(2)} USD</span></span>
+              <span>Calls: <span className="font-semibold text-gray-100">{totalApiCalls}</span></span>
+              <span>Turns: <span className="font-semibold text-gray-100">{usageTextTurns}</span></span>
+              <span>Voice: <span className="font-semibold text-gray-100">{usageVoiceGenerations}</span></span>
+              <span>Images: <span className="font-semibold text-gray-100">{usageImagesGenerated}</span></span>
+              <span>Fails: <span className="font-semibold text-gray-100">{totalFailures}</span></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
