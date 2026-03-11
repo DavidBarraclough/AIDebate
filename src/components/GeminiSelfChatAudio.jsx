@@ -87,20 +87,32 @@ const makeTelemetryState = () => ({
   quotaHits: { tts: 0, image: 0 },
 })
 
-const TEXT_ONLY_WORD_DELAY_MS = 480
-const TEXT_ONLY_MIN_DELAY_MS = 6500
-const TEXT_ONLY_MAX_DELAY_MS = 15000
+const TEXT_ONLY_WORD_DELAY_MS = 430
+const TEXT_ONLY_MIN_DELAY_MS = 4800
+const TEXT_ONLY_MAX_DELAY_MS = 12000
+const TEXT_ONLY_TURN_BUFFER_MS = 350
 
 const EMOTIONS = {
-  CONFIDENT:  { label: 'Confident',  emoji: '😎', color: 'bg-green-600' },
-  PASSIONATE: { label: 'Passionate', emoji: '🔥', color: 'bg-orange-600' },
-  FRUSTRATED: { label: 'Frustrated', emoji: '😤', color: 'bg-red-600' },
-  CONCEDING:  { label: 'Conceding',  emoji: '🤝', color: 'bg-teal-600' },
-  AMUSED:     { label: 'Amused',     emoji: '😄', color: 'bg-yellow-600' },
-  SKEPTICAL:  { label: 'Skeptical',  emoji: '🤨', color: 'bg-indigo-600' },
-  DEFIANT:    { label: 'Defiant',    emoji: '💪', color: 'bg-purple-600' },
-  THOUGHTFUL: { label: 'Thoughtful', emoji: '🤔', color: 'bg-sky-600' },
+  CONFIDENT:  { label: 'Confident',  color: 'bg-green-600', icon: 'spark' },
+  PASSIONATE: { label: 'Passionate', color: 'bg-orange-600', icon: 'flame' },
+  FRUSTRATED: { label: 'Frustrated', color: 'bg-red-600', icon: 'bolt' },
+  CONCEDING:  { label: 'Conceding',  color: 'bg-teal-600', icon: 'handshake' },
+  AMUSED:     { label: 'Amused',     color: 'bg-yellow-600', icon: 'smile' },
+  SKEPTICAL:  { label: 'Skeptical',  color: 'bg-indigo-600', icon: 'search' },
+  DEFIANT:    { label: 'Defiant',    color: 'bg-purple-600', icon: 'shield' },
+  THOUGHTFUL: { label: 'Thoughtful', color: 'bg-sky-600', icon: 'brain' },
 }
+
+const buildDebateRules = (otherName, styleRule) => `You are in a lively spoken debate with ${otherName}. Rules:
+- Speak naturally, as you would in a real conversation. Do NOT start every response with your opponent's name — use it only occasionally, the way people do in real debates (once every few exchanges at most).
+- ADVANCE the debate. Each response must introduce a NEW angle, mechanism, tradeoff, or counterexample. Never restate what you or your opponent already said.
+- Directly challenge a SPECIFIC thing your opponent just said. Refer to one exact claim they made and attack it.
+- Always speak in the first person — say "I", "me", "my". Never refer to yourself in the third person.
+- Stay deeply in character. Keep each response to 3-4 punchy spoken sentences.
+- Start EVERY response with an emotion tag in square brackets: one of [CONFIDENT], [PASSIONATE], [FRUSTRATED], [CONCEDING], [AMUSED], [SKEPTICAL], [DEFIANT], [THOUGHTFUL]. Pick the one that best fits your emotional state. Then write your reply.
+- A human MODERATOR may interrupt with a [MODERATOR OVERRIDE] message. When this happens, you MUST immediately pivot to address the moderator's new direction or topic. Abandon your previous argument and respond to the moderator's instruction while staying in character.${styleRule ? '\n' + styleRule : ''}`
+
+const PER_TURN_QUALITY_REMINDER = 'Reply using "I" — never say "{name} thinks" or "{name} feels". Be vivid and specific: rebut one concrete claim, add one fresh argument or example, and end with a sharp challenge.'
 
 function parseEmotion(text) {
   const match = text.match(/^\[([A-Z]+)\]\s*/)
@@ -108,18 +120,106 @@ function parseEmotion(text) {
   return { emotion: 'CONFIDENT', cleanText: text }
 }
 
+function IconVolumeOn({ className = 'w-5 h-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.5 6a9 9 0 0 1 0 12" />
+    </svg>
+  )
+}
+
+function IconVolumeOff({ className = 'w-5 h-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <line x1="23" y1="9" x2="17" y2="15" />
+      <line x1="17" y1="9" x2="23" y2="15" />
+    </svg>
+  )
+}
+
+function IconImage({ className = 'w-5 h-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
+      <circle cx="8.5" cy="9" r="1.5" />
+      <path d="M21 15l-5-5L5 20" />
+    </svg>
+  )
+}
+
+function IconDice({ className = 'w-5 h-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="3" ry="3" />
+      <circle cx="9" cy="9" r="1" fill="currentColor" />
+      <circle cx="15" cy="15" r="1" fill="currentColor" />
+      <circle cx="9" cy="15" r="1" fill="currentColor" />
+      <circle cx="15" cy="9" r="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function IconMic({ className = 'w-5 h-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M19 11a7 7 0 0 1-14 0" />
+      <line x1="12" y1="18" x2="12" y2="21" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+    </svg>
+  )
+}
+
+function IconStop({ className = 'w-5 h-5' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="5" y="5" width="14" height="14" rx="2" />
+    </svg>
+  )
+}
+
+function IconClock({ className = 'w-4 h-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v6l4 2" />
+    </svg>
+  )
+}
+
+function EmotionIcon({ icon, className = 'w-4 h-4' }) {
+  if (icon === 'flame') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="M12 2s-2 3-2 5a4 4 0 1 0 8 0c0-2-2-5-2-5s.5 3-2 5c-1.5 1.2-2 2.6-2 4a4 4 0 1 0 8 0c0-5-4-9-4-9Z" /></svg>
+  }
+  if (icon === 'bolt') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" /></svg>
+  }
+  if (icon === 'handshake') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="m3 11 4-4 4 4" /><path d="m21 11-4-4-4 4" /><path d="M7 11h10" /><path d="M6 14h12" /></svg>
+  }
+  if (icon === 'smile') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="10" x2="9" y2="10" /><line x1="15" y1="10" x2="15" y2="10" /></svg>
+  }
+  if (icon === 'search') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+  }
+  if (icon === 'shield') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" /></svg>
+  }
+  if (icon === 'brain') {
+    return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="M9 5a3 3 0 1 0-3 3v1a3 3 0 0 0 3 3" /><path d="M15 5a3 3 0 1 1 3 3v1a3 3 0 0 1-3 3" /><path d="M9 12v4a3 3 0 0 0 6 0v-4" /></svg>
+  }
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true"><path d="M12 3v18" /><path d="M3 12h18" /></svg>
+}
+
 function getSystemPrompt(name, personality, otherName, styleKey) {
   const styleRule = STYLE_PROMPTS[styleKey] || ''
   return `Your name is ${name}. You ARE this character: ${personality}. Fully embody this role — adopt the worldview, speech patterns, knowledge, mannerisms, and emotional perspective that this character would naturally have.
 
-You are in a lively spoken debate with ${otherName}. Rules:
-- Speak naturally, as you would in a real conversation. Do NOT start every response with your opponent's name — use it only occasionally, the way people do in real debates (once every few exchanges at most).
-- ADVANCE the debate. Each response must introduce a NEW angle, counterexample, or argument. Never restate what you or your opponent have already said.
-- Directly challenge a SPECIFIC thing your opponent just said — don't respond to their general position, respond to their actual words.
-- Always speak in the first person — say "I", "me", "my". Never refer to yourself in the third person.
-- Stay deeply in character. Keep each response to 2-3 punchy sentences.
-- Start EVERY response with an emotion tag in square brackets: one of [CONFIDENT], [PASSIONATE], [FRUSTRATED], [CONCEDING], [AMUSED], [SKEPTICAL], [DEFIANT], [THOUGHTFUL]. Pick the one that best fits your emotional state. Then write your reply.
-- A human MODERATOR may interrupt with a [MODERATOR OVERRIDE] message. When this happens, you MUST immediately pivot to address the moderator's new direction or topic. Abandon your previous argument and respond to the moderator's instruction while staying in character.${styleRule ? '\n' + styleRule : ''}`
+${buildDebateRules(otherName, styleRule)}`
 }
 
 const BAR_HEIGHTS = [30, 60, 45, 80, 55, 70, 35, 65, 50, 75, 40, 60]
@@ -142,8 +242,11 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, name, onNa
         {running ? (
           <>
             {emotion && EMOTIONS[emotion] && (
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium text-white w-fit transition-all duration-500 ${EMOTIONS[emotion].color}`}>
-                <span>{EMOTIONS[emotion].emoji}</span> <span>{EMOTIONS[emotion].label}</span>
+              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold text-white w-fit transition-all duration-500 shadow-sm ring-1 ring-white/20 ${EMOTIONS[emotion].color}`}>
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black/20">
+                  <EmotionIcon icon={EMOTIONS[emotion].icon} className="w-4 h-4" />
+                </span>
+                <span>{EMOTIONS[emotion].label}</span>
               </span>
             )}
             <span className="text-sm text-white/40 italic leading-tight line-clamp-2 max-w-full">{personality}</span>
@@ -631,7 +734,13 @@ export default function GeminiSelfChatAudio() {
   const [viewIndex, setViewIndex] = useState(null)
   const [running, setRunning] = useState(false)
   const [initialising, setInitialising] = useState(false)
-  const [muted, setMuted] = useState(false)
+  const [muted, _setMuted] = useState(false)
+  const mutedRef = useRef(false)
+  const setMuted = (v) => {
+    const next = typeof v === 'function' ? v(mutedRef.current) : v
+    mutedRef.current = next
+    _setMuted(next)
+  }
   const [imagesEnabled, _setImagesEnabled] = useState(true)
   const imagesEnabledRef = useRef(true)
   const setImagesEnabled = (v) => {
@@ -798,6 +907,16 @@ export default function GeminiSelfChatAudio() {
     setVoices(prev => ({ ...prev, [persona]: value }))
   }
 
+  const waitWithInterrupt = async (ms) => {
+    let remaining = ms
+    const step = 120
+    while (remaining > 0 && !stopRef.current && !pauseDebateRef.current) {
+      const slice = Math.min(step, remaining)
+      await new Promise(r => setTimeout(r, slice))
+      remaining -= slice
+    }
+  }
+
   const randomise = async () => {
     setRandomising(true)
     setError(null)
@@ -911,7 +1030,8 @@ export default function GeminiSelfChatAudio() {
     const name = namesRef.current[persona]
     // Append a per-turn reminder so the model can't drift into third-person
     // even if earlier history contains third-person mistakes
-    const augmentedMessage = `${message}\n\n[You are ${name}. Reply using "I" — never say "${name} thinks" or "${name} feels".]`
+    const qualityReminder = PER_TURN_QUALITY_REMINDER.replaceAll('{name}', name)
+    const augmentedMessage = `${message}\n\n[You are ${name}. ${qualityReminder}]`
     const data = await postJson('self-chat-turn', {
       systemPrompt: getSystemPrompt(
         name,
@@ -924,6 +1044,21 @@ export default function GeminiSelfChatAudio() {
     })
     if (data.error) throw new Error(data.error)
     return data.reply
+  }
+
+  const buildSpokenSummary = (data) => {
+    const clean = (text, maxLen = 170) => {
+      if (!text) return ''
+      const singleLine = String(text).replace(/\s+/g, ' ').trim()
+      if (singleLine.length <= maxLen) return singleLine
+      return `${singleLine.slice(0, maxLen).replace(/[\s,.;:!?-]+$/, '')}.`
+    }
+
+    const winnerLabel = data?.winner === 'draw'
+      ? 'Draw'
+      : (data?.winner === 'A' ? namesRef.current.A : namesRef.current.B)
+    const reason = clean(data?.winnerReasoning, 220)
+    return [`Winner: ${winnerLabel}.`, reason].filter(Boolean).join(' ')
   }
 
   const fetchSummary = async () => {
@@ -940,10 +1075,31 @@ export default function GeminiSelfChatAudio() {
       const data = await postJson('debate-summary', { transcript, nameA: namesRef.current.A, nameB: namesRef.current.B, topic })
       if (data.error) throw new Error(data.error)
       setSummary(data)
+
+      // Read a concise, high-signal summary in the same moderator voice.
+      if (!mutedRef.current && !stopRef.current) {
+        const spokenSummary = buildSpokenSummary(data)
+        if (spokenSummary) {
+          setSpeaking('host')
+          setLoadingVoice('host')
+          const summaryTTS = await fetchTTS(spokenSummary, 'host', HOST_VOICE, postJson)
+          setLoadingVoice(null)
+          if (!stopRef.current) {
+            await playTTS(summaryTTS, currentAudioRef, () => {
+              setMuted(true)
+              setQuotaAlerts(prev => ({ ...prev, tts: true }))
+              trackQuotaHit('tts')
+            })
+          }
+          setSpeaking(null)
+        }
+      }
     } catch (err) {
       console.error('Summary error:', err.message)
       setError('Could not generate summary: ' + err.message)
     } finally {
+      setSpeaking(null)
+      setLoadingVoice(null)
       setSummaryLoading(false)
     }
   }
@@ -984,7 +1140,7 @@ export default function GeminiSelfChatAudio() {
       let prefetchImagePromise = null
 
       // Host introduction on fresh start
-      if (!isResume && !muted) {
+      if (!isResume) {
         const nameA = namesRef.current.A
         const nameB = namesRef.current.B
         const cleanTopic = topic.trim().replace(/[?.!,;:]+$/, '')
@@ -994,25 +1150,28 @@ export default function GeminiSelfChatAudio() {
         const intro = `Welcome! Tonight's topic: ${cleanTopic}. In one corner, we have ${nameA}. And in the other corner, ${nameB}.${styleIntro} Let the debate begin!`
         setMessages(prev => [...prev, { persona: 'host', content: intro }])
         setInitialising(false)
-        setSpeaking('host')
-        setLoadingVoice('host')
-
         // Prefetch first speaker's reply + TTS while host intro plays
         prefetchReplyPromise = callTurn('A', historyARef.current, lastMessageRef.current)
-        prefetchTTSPromise = prefetchReplyPromise.then(r =>
-          fetchTTS(parseEmotion(r).cleanText, 'A', voicesRef.current.A, postJson)
-        ).catch(() => null)
+        prefetchTTSPromise = !mutedRef.current
+          ? prefetchReplyPromise.then(r =>
+              fetchTTS(parseEmotion(r).cleanText, 'A', voicesRef.current.A, postJson)
+            ).catch(() => null)
+          : null
 
-        const hostTTS = await fetchTTS(intro, 'host', HOST_VOICE, postJson)
-        setLoadingVoice(null)
-        if (!stopRef.current) {
-          await playTTS(hostTTS, currentAudioRef, () => {
-            setMuted(true)
-            setQuotaAlerts(prev => ({ ...prev, tts: true }))
-            trackQuotaHit('tts')
-          })
+        if (!mutedRef.current) {
+          setSpeaking('host')
+          setLoadingVoice('host')
+          const hostTTS = await fetchTTS(intro, 'host', HOST_VOICE, postJson)
+          setLoadingVoice(null)
+          if (!stopRef.current) {
+            await playTTS(hostTTS, currentAudioRef, () => {
+              setMuted(true)
+              setQuotaAlerts(prev => ({ ...prev, tts: true }))
+              trackQuotaHit('tts')
+            })
+          }
+          setSpeaking(null)
         }
-        setSpeaking(null)
         if (stopRef.current) throw new Error('stopped')
       }
 
@@ -1084,7 +1243,7 @@ export default function GeminiSelfChatAudio() {
         // Prefetch NEXT turn's reply + TTS + image while current TTS plays
         const nextReplyPromise = callTurn(nextTurn, nextTurn === 'A' ? historyARef.current : historyBRef.current, reply)
         // Chain TTS fetch after reply resolves so audio is ready instantly
-        const nextTTSPromise = !muted
+        const nextTTSPromise = !mutedRef.current
           ? nextReplyPromise.then(nextReply =>
               fetchTTS(parseEmotion(nextReply).cleanText, nextTurn, voicesRef.current[nextTurn], postJson)
             ).catch(() => null)
@@ -1104,7 +1263,7 @@ export default function GeminiSelfChatAudio() {
           // Prefetched — audio ready, play immediately
           setSpeaking(turn)
           ttsPromise = playTTS(ttsData, currentAudioRef, onQuotaHit)
-        } else if (!muted) {
+        } else if (!mutedRef.current) {
           // Not prefetched — show loading state while fetching voice
           setLoadingVoice(turn)
           const freshTTSData = await fetchTTS(cleanText, turn, voicesRef.current[turn], postJson)
@@ -1116,18 +1275,17 @@ export default function GeminiSelfChatAudio() {
           ttsPromise = Promise.resolve()
         }
         // Keep text-only mode readable when voice/image are disabled.
-        const textOnlyMode = muted && !imagesEnabledRef.current
+        const textOnlyMode = mutedRef.current && !imagesEnabledRef.current
         const textOnlyDelayMs = Math.min(
           TEXT_ONLY_MAX_DELAY_MS,
           Math.max(TEXT_ONLY_MIN_DELAY_MS, cleanText.split(/\s+/).length * TEXT_ONLY_WORD_DELAY_MS),
         )
-        const readingDelay = muted
-          ? new Promise(r => setTimeout(
-              r,
+        const readingDelay = mutedRef.current
+          ? waitWithInterrupt(
               textOnlyMode
-                ? textOnlyDelayMs
-                : Math.max(2000, cleanText.split(/\s+/).length * 250),
-            ))
+                ? textOnlyDelayMs + TEXT_ONLY_TURN_BUFFER_MS
+                : Math.max(1200, cleanText.split(/\s+/).length * 170),
+            )
           : null
         await Promise.all([ttsPromise, currentImagePromise, readingDelay].filter(Boolean))
         setSpeaking(null)
@@ -1215,6 +1373,7 @@ export default function GeminiSelfChatAudio() {
     stopRef.current = true
     pauseDebateRef.current = false
     try { if (currentAudioRef.current?.stop) currentAudioRef.current.stop() } catch {}
+    setRunning(false)
     setMessages([])
     setImages({})
     setViewIndex(null)
@@ -1287,12 +1446,10 @@ export default function GeminiSelfChatAudio() {
           line-height: 1.2;
         }
         .uniform-text-scale .challenge-micro {
-          font-size: 0.6rem !important;
-          line-height: 1;
-          max-width: 100%;
+          font-size: 0.68rem !important;
+          line-height: 1.1;
           white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          letter-spacing: 0.02em;
         }
         .dragging-split * { user-select: none !important; cursor: col-resize !important; }
       `}</style>
@@ -1320,23 +1477,27 @@ export default function GeminiSelfChatAudio() {
               </div>
             ) : (
               <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
-                <span>⏱</span>
-                <span>up to 10 min</span>
+                <IconClock className="w-4 h-4" />
+                <span>max 10 min</span>
               </div>
             )}
             <button
-              onClick={() => { setMuted(m => !m); if (!muted && currentAudioRef.current) currentAudioRef.current.pause() }}
+              onClick={() => {
+                const nextMuted = !mutedRef.current
+                setMuted(nextMuted)
+                if (nextMuted && currentAudioRef.current) currentAudioRef.current.pause()
+              }}
               title={muted ? 'Unmute' : 'Mute'}
-              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer ${muted ? 'bg-gray-700 text-gray-400' : 'bg-green-900 text-green-300'}`}
+              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer border ${muted ? 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30' : 'bg-green-900 text-green-300 border-green-700/40'}`}
             >
-              {muted ? '🔇' : '🔊'}
+              {muted ? <IconVolumeOff /> : <IconVolumeOn />}
             </button>
             <button
               onClick={() => setImagesEnabled(m => !m)}
               title={imagesEnabled ? 'Disable image generation' : 'Enable image generation'}
-              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer ${imagesEnabled ? 'bg-violet-900 text-violet-300' : 'bg-gray-700 text-gray-500 line-through'}`}
+              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer border ${imagesEnabled ? 'bg-violet-900 text-violet-300 border-violet-700/40' : 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30'}`}
             >
-              🖼️
+              <IconImage />
             </button>
             {!running && !paused ? (
               <>
@@ -1366,7 +1527,9 @@ export default function GeminiSelfChatAudio() {
                   title="Randomise characters and topic"
                   className="px-4 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
                 >
-                  {randomising ? '⏳' : '🎲'}
+                  {randomising
+                    ? <span className="inline-block w-4 h-4 border-2 border-amber-100/80 border-t-transparent rounded-full animate-spin" />
+                    : <IconDice className="w-5 h-5" />}
                 </button>
               </>
             ) : (
@@ -1383,25 +1546,27 @@ export default function GeminiSelfChatAudio() {
             )}
             {running && !paused ? (
               <button onClick={pause} className="px-5 py-3 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                Pause
+                Pause Session
               </button>
             ) : running && paused ? (
               <button onClick={resumeDebate} className="px-5 py-3 bg-green-700 hover:bg-green-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                Resume
+                Resume Session
               </button>
             ) : (
               <button onClick={start} disabled={!topic.trim()} className="px-5 py-3 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
-                Start
+                Begin Session
               </button>
             )}
-            {(messages.length > 0 || paused) && (
-              <button onClick={reset} className="px-5 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-base transition-colors cursor-pointer shrink-0">
-                Reset
-              </button>
-            )}
-            {paused && messages.length >= 4 && !summary && !summaryLoading && (
-              <button onClick={fetchSummary} className="px-5 py-3 bg-amber-700 hover:bg-amber-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                Summarise
+            <button onClick={reset} className="px-5 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-base transition-colors cursor-pointer shrink-0">
+              Reset Session
+            </button>
+            {paused && !summaryLoading && (
+              <button
+                onClick={fetchSummary}
+                disabled={messages.length < 4 || !!summary}
+                className="px-5 py-3 bg-amber-700 hover:bg-amber-600 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
+              >
+                Generate Summary
               </button>
             )}
           </div>
@@ -1411,7 +1576,7 @@ export default function GeminiSelfChatAudio() {
             value={topic}
             onChange={e => setTopic(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && start()}
-            placeholder="Give them a topic…"
+            placeholder="Enter a debate question or prompt..."
             disabled={running}
             className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-indigo-500 placeholder-gray-500 disabled:opacity-50 shrink-0"
           />
@@ -1422,13 +1587,13 @@ export default function GeminiSelfChatAudio() {
               {quotaAlerts.tts && (
                 <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-950/80 border border-amber-700/50 text-amber-200 text-sm">
                   <span className="text-base leading-none">🔇</span>
-                  <span><strong>Voice quota exceeded</strong> — audio auto-muted, debate continues as text. Resets daily.</span>
+                  <span><strong>Voice limit reached</strong> - audio muted automatically, session continues in text. Resets daily.</span>
                 </div>
               )}
               {quotaAlerts.image && (
                 <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-950/80 border border-amber-700/50 text-amber-200 text-sm">
                   <span className="text-base leading-none">🖼️</span>
-                  <span><strong>Image quota exceeded</strong> — images auto-disabled. Resets daily.</span>
+                  <span><strong>Image limit reached</strong> - visuals disabled automatically. Resets daily.</span>
                 </div>
               )}
             </div>
@@ -1442,7 +1607,7 @@ export default function GeminiSelfChatAudio() {
                 <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-base text-gray-400">Preparing debate…</span>
+              <span className="text-base text-gray-400">Preparing session...</span>
             </div>
           )}
 
@@ -1457,12 +1622,12 @@ export default function GeminiSelfChatAudio() {
                       <div className={`w-2 rounded-full shrink-0 mt-1 bg-amber-400 ${isHostSpeaking ? 'animate-pulse' : ''}`} style={{ minHeight: '1rem' }} />
                       <div className={`rounded-2xl px-4 py-2.5 text-base flex-1 bg-amber-950 text-amber-100 ${isHostSpeaking ? 'ring-1 ring-amber-400' : ''}`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-semibold opacity-70">Host</span>
+                          <span className="text-sm font-semibold opacity-70">Moderator</span>
                           {loadingVoice === 'host' && (
-                            <span className="text-xs text-amber-300 animate-pulse">generating voice…</span>
+                            <span className="text-xs text-amber-300 animate-pulse">generating voice...</span>
                           )}
                           {isHostSpeaking && loadingVoice !== 'host' && (
-                            <span className="text-lg text-amber-300 animate-pulse font-semibold">speaking…</span>
+                            <span className="text-lg text-amber-300 animate-pulse font-semibold">speaking...</span>
                           )}
                         </div>
                         {msg.content}
@@ -1475,7 +1640,7 @@ export default function GeminiSelfChatAudio() {
                     <div key={i} className="flex gap-3">
                       <div className="w-2 rounded-full shrink-0 mt-1 bg-green-400" style={{ minHeight: '1rem' }} />
                       <div className="rounded-2xl px-4 py-2.5 text-base flex-1 bg-green-950 text-green-100 ring-1 ring-green-700">
-                        <span className="text-sm font-semibold opacity-70 block mb-1">You (redirecting)</span>
+                        <span className="text-sm font-semibold opacity-70 block mb-1">You (redirect)</span>
                         {msg.content}
                       </div>
                     </div>
@@ -1493,7 +1658,7 @@ export default function GeminiSelfChatAudio() {
                   </div>
                 )
               })}
-              {running && !speaking && (
+              {running && !paused && !speaking && (
                 <div className="flex gap-3">
                   <div className="w-2 rounded-full shrink-0 mt-1 bg-gray-600" style={{ minHeight: '1rem' }} />
                   <div className="bg-gray-800 rounded-2xl px-4 py-3">
@@ -1510,7 +1675,7 @@ export default function GeminiSelfChatAudio() {
                 <div className="flex gap-3">
                   <div className="w-2 rounded-full shrink-0 mt-1 bg-amber-400 animate-pulse" style={{ minHeight: '1rem' }} />
                   <div className="rounded-2xl px-4 py-3 text-base flex-1 bg-amber-950/50 border border-amber-700/50">
-                    <span className="text-sm font-semibold text-amber-400 block mb-1">Generating Summary...</span>
+                    <span className="text-sm font-semibold text-amber-400 block mb-1">Generating summary...</span>
                     <div className="flex gap-1 mt-2">
                       {[0, 150, 300].map(d => (
                         <span key={d} className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
@@ -1586,7 +1751,7 @@ export default function GeminiSelfChatAudio() {
         <div className="w-full flex-1 flex flex-col gap-3 min-w-0 min-h-[50vh] lg:min-h-0 overflow-visible">
 
           {/* Avatar stage */}
-          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+          <div className={`flex flex-col sm:flex-row gap-3 shrink-0 ${listening ? 'pb-10' : ''}`}>
             <AIAvatar
               persona="A"
               isSpeaking={speaking === 'A'}
@@ -1601,26 +1766,30 @@ export default function GeminiSelfChatAudio() {
               running={running}
               emotion={emotions.A}
             />
-            <div className="flex flex-col items-center justify-center gap-2 shrink-0">
-              {!running && <div className="text-gray-600 text-xs font-medium">VS</div>}
+            <div className="relative flex flex-col items-center justify-center gap-2 shrink-0 overflow-visible">
+              {!running && <div className="text-gray-600 text-xs font-medium">Debate</div>}
               {running && (
                 <button
                   onClick={handleInterrupt}
-                  title={listening ? 'Cancel listening' : 'Challenge the debaters'}
-                  className={`rounded-full flex flex-col items-center justify-center gap-1 transition-all cursor-pointer font-medium
-                    ${inputMode === 'voice' ? 'w-14 h-14 text-lg' : 'w-10 h-10 text-base'}
+                  title={listening ? 'Stop listening' : 'Redirect the discussion'}
+                  className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer font-medium
+                    ${inputMode === 'voice'
+                      ? (listening ? 'w-14 h-14 rounded-full text-lg' : 'w-20 h-16 rounded-2xl text-base px-1')
+                      : 'w-10 h-10 rounded-full text-base'}
                     ${listening
                       ? 'bg-red-600 animate-pulse text-white ring-2 ring-red-400 shadow-lg shadow-red-900'
                       : inputMode === 'voice'
                         ? 'bg-indigo-700 hover:bg-indigo-600 text-white ring-2 ring-indigo-500 shadow-lg shadow-indigo-900'
                         : 'bg-gray-700 hover:bg-gray-500 text-gray-300'}`}
                 >
-                  <span>{listening ? '⏹' : '🎤'}</span>
-                  {inputMode === 'voice' && !listening && <span className="challenge-micro font-semibold tracking-wide opacity-70">CHALLENGE</span>}
+                  <span>{listening ? <IconStop className="w-5 h-5" /> : <IconMic className="w-5 h-5" />}</span>
+                  {inputMode === 'voice' && !listening && <span className="challenge-micro font-semibold tracking-wide opacity-70">REDIRECT</span>}
                 </button>
               )}
               {listening && interimText && (
-                <p className="text-xs text-green-400 text-center max-w-[60px] italic leading-tight line-clamp-2">{interimText}</p>
+                <p className="absolute left-1/2 top-full z-20 mt-1 w-max max-w-[180px] -translate-x-1/2 rounded-md border border-green-500/40 bg-black/80 px-2 py-1 text-xs text-green-300 text-center italic leading-snug whitespace-normal break-words shadow-lg">
+                  {interimText}
+                </p>
               )}
               {running && (
                 <div className={`flex gap-0.5 ${(!speaking || listening) ? 'invisible' : ''}`}>
@@ -1649,11 +1818,13 @@ export default function GeminiSelfChatAudio() {
           {/* Main image — fills remaining height */}
           <div className="flex-1 bg-gray-900 rounded-xl overflow-hidden relative min-h-[260px] lg:min-h-0">
             {!imagesEnabled ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-600">
-                <span className="text-4xl opacity-30">🖼️</span>
-                <span className="text-sm">Images disabled</span>
-                <button onClick={() => setImagesEnabled(true)} className="text-xs text-violet-500 hover:text-violet-400 underline cursor-pointer">
-                  Enable
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-red-200/70">
+                <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gray-800/80 ring-1 ring-red-700/60 text-red-300">
+                  <IconImage className="w-7 h-7" />
+                </span>
+                <span className="text-sm">Visuals disabled</span>
+                <button onClick={() => setImagesEnabled(true)} className="text-xs text-red-300 hover:text-red-200 underline cursor-pointer">
+                  Enable visuals
                 </button>
               </div>
             ) : displayImage ? (
@@ -1667,7 +1838,7 @@ export default function GeminiSelfChatAudio() {
             ) : (
               <div className="absolute inset-0 bg-gray-800 animate-pulse flex items-center justify-center">
                 <span className="text-sm text-gray-600">
-                  {(messages.length > 0 || running) ? 'generating image…' : 'Start a debate to see AI-generated images'}
+                  {(messages.length > 0 || running) ? 'Generating visual context...' : 'Start a session to generate visual context'}
                 </span>
               </div>
             )}
@@ -1675,7 +1846,7 @@ export default function GeminiSelfChatAudio() {
               <div className="absolute bottom-0 left-0 right-0 px-4 py-2 bg-black/50 flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${PERSONAS[messages[displayIndex].persona].dot}`} />
                 <span className="text-xs text-white/70">
-                  Turn {displayIndex + 1} · {names[messages[displayIndex].persona]}
+                  Round {displayIndex + 1} · {names[messages[displayIndex].persona]}
                 </span>
               </div>
             )}
