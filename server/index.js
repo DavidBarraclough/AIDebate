@@ -199,6 +199,7 @@ Examples:
 app.post('/api/generate-setup', async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY
   const category = req.body?.category || 'wild-card'
+  const style = req.body?.style || 'normal'
 
   const categoryPrompts = {
     'comedy': `Category: COMEDY. Generate hilarious, absurd, over-the-top characters. Think slapstick, satire, ridiculous premises. Names should be funny or punny.
@@ -234,9 +235,76 @@ Example: {"A":{"name":"Cassandra","personality":"doom-obsessed and dramatically 
 
   const categoryGuide = categoryPrompts[category] || categoryPrompts['wild-card']
 
+  const styleGuides = {
+    rhyme: `Style context: RHYME BATTLE mode.
+  Rules:
+  - Names should sound lyrical, poetic, or spoken-word themed.
+  - Topic should suit verbal sparring, persuasion, and wordplay.
+  - Personalities should be archetypal rhyme poets or spoken-word duelists.`,
+    rap: `Style context: RAP BATTLE mode.
+Rules:
+- Both names MUST sound like rap or street-stage names.
+- Topic MUST fit rap-culture, crew rivalry, street respect, hustle, or block politics.
+- Personalities MUST be archetypal rap/gang personas (for example: kingpin, street poet, enforcer, hustler strategist, battle legend).
+- Keep it theatrical and creative, never explicit real-world criminal instructions.`,
+    shakespeare: `Style context: SHAKESPEAREAN mode.
+  Rules:
+  - Names should feel courtly, noble, or stage-dramatic.
+  - Topic should fit themes of honor, ambition, duty, power, and tragedy.
+  - Personalities should be archetypal nobles, courtiers, schemers, or philosophical dramatists.`,
+    pirate: `Style context: PIRATE SPEAK mode.
+  Rules:
+  - Names should sound pirate-like, nautical, or captain/crew themed.
+  - Topic should fit ships, crews, mutiny, treasure, lawlessness, and freedom.
+  - Personalities should be archetypal captains, quartermasters, raiders, and sea rogues.`,
+    eli5: `Style context: EXPLAIN LIKE I'M FIVE mode.
+  Rules:
+  - Names should feel friendly, approachable, and educator-like.
+  - Topic should be understandable through simple everyday analogies.
+  - Personalities should be archetypal patient explainers, mentors, or playful teachers.`,
+    roast: `Style context: ROAST BATTLE mode.
+  Rules:
+  - Names should sound stage-ready for comedians or roast performers.
+  - Topic should create comedic conflict and punchline opportunities.
+  - Personalities should be archetypal stand-up roasters, sarcastic comics, and insult specialists.`,
+    conspiracy: `Style context: CONSPIRACY mode.
+  Rules:
+  - Names should sound mysterious, coded, or underground-broadcast themed.
+  - Topic should involve secrecy, control, hidden agendas, or institutional suspicion.
+  - Personalities should be archetypal whistleblowers, investigators, and paranoid theorists.`,
+    haiku: `Style context: HAIKU ONLY mode.
+  Rules:
+  - Names should feel minimal, poetic, and reflective.
+  - Topic should suit contemplation, nature, balance, and philosophy.
+  - Personalities should be archetypal minimalist poets, observers, and reflective thinkers.`,
+    french: `Style context: FRENCH ACCENT mode.
+Rules:
+- Both names MUST be authentic French names.
+- Topic MUST be explicitly connected to France or French language/culture.
+- Personalities should reference French social, cultural, or civic context naturally.`,
+    spanish: `Style context: SPANISH ACCENT mode.
+Rules:
+- Both names MUST be authentic Spanish names.
+- Topic MUST be explicitly connected to Spain or Spanish language/culture.
+- Personalities should reference Spanish social, cultural, or civic context naturally.`,
+    german: `Style context: GERMAN ACCENT mode.
+Rules:
+- Both names MUST be authentic German names.
+- Topic MUST be explicitly connected to Germany or German language/culture.
+- Personalities should reference German social, cultural, or civic context naturally.`,
+    japanese: `Style context: JAPANESE ACCENT mode.
+Rules:
+- Both names MUST be authentic Japanese names.
+- Topic MUST be explicitly connected to Japan or Japanese language/culture.
+- Personalities should reference Japanese social, cultural, or civic context naturally.`,
+  }
+  const styleGuide = styleGuides[style] || ''
+
   const prompt = `Generate a creative AI debate setup. Reply with ONLY a JSON object — no markdown, no explanation, just raw JSON.
 
 ${categoryGuide}
+
+${styleGuide}
 
 Rules: names match gender and fit the category theme, vivid dramatic contrast between characters, topic suits them specifically (max 12 words), personalities 4-7 specific words. Be surprising and creative each time — never repeat previous setups.`
   console.log('generate-setup: start')

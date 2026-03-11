@@ -97,18 +97,18 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, avatarImag
   const p = PERSONAS[persona]
   const voiceLabel = VOICE_OPTIONS.find(v => v.value === voice)
   return (
-    <div className={`flex-1 rounded-xl p-2.5 ${p.avatarBg} flex items-center gap-3 transition-all duration-300
+    <div className={`flex-1 rounded-xl p-5 ${p.avatarBg} flex flex-col items-center gap-3.5 transition-all duration-300
       ${isSpeaking ? `ring-2 ${p.ring} shadow-lg ${p.glow}` : 'ring-1 ring-white/10'}`}>
 
       {/* Avatar circle + sound bars */}
-      <div className="flex flex-col items-center gap-1 shrink-0">
-        <div className={`relative w-14 h-14 rounded-full overflow-hidden ring-3 transition-all duration-300
+      <div className="flex flex-col items-center gap-1.5 shrink-0">
+        <div className={`relative w-24 h-24 rounded-full overflow-hidden ring-3 transition-all duration-300
           ${isSpeaking ? p.ring : 'ring-white/20'}`}
           style={isSpeaking ? { animation: 'talking 0.18s ease-in-out infinite alternate' } : {}}>
           {avatarImage ? (
             <img src={avatarImage} alt={name} className="w-full h-full object-cover" style={{ animation: 'fadeIn 0.6s ease' }} />
           ) : (
-            <div className={`w-full h-full flex items-center justify-center ${p.avatarBg} text-xl font-black
+            <div className={`w-full h-full flex items-center justify-center ${p.avatarBg} text-3xl font-black
               ${avatarLoading ? 'animate-pulse' : 'text-white/80'}`}>
               {avatarLoading ? '?' : persona}
             </div>
@@ -121,9 +121,9 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, avatarImag
             </div>
           )}
         </div>
-        <div className="flex items-end gap-px h-3">
+        <div className="flex items-end gap-px h-4">
           {BAR_HEIGHTS.slice(0, 8).map((h, i) => (
-            <div key={i} className={`w-1 rounded-full transition-all ${p.barColor}`}
+            <div key={i} className={`w-1.5 rounded-full transition-all ${p.barColor}`}
               style={{
                 height: isSpeaking ? `${h}%` : '15%',
                 opacity: isSpeaking ? 0.9 : 0.25,
@@ -135,34 +135,37 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, avatarImag
       </div>
 
       {/* Details — right of circle */}
-      <div className="flex flex-col gap-1 min-w-0 flex-1">
+      <div className="flex flex-col gap-1.5 min-w-0 w-full items-center text-center">
         {running ? (
-          <span className={`text-sm font-semibold ${p.barColor.replace('bg-', 'text-')} truncate`}>{name}</span>
+          <span className={`text-xl font-semibold ${p.barColor.replace('bg-', 'text-')} truncate max-w-full`}>{name}</span>
         ) : (
           <input value={name} onChange={e => onNameChange(e.target.value)} placeholder="Name…"
-            className="bg-black/40 border border-white/15 rounded-lg px-2 py-0.5 text-sm font-semibold text-white/90 focus:outline-none focus:border-white/40 placeholder-white/20" />
-        )}
-        {running && emotion && EMOTIONS[emotion] ? (
-          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium text-white w-fit transition-all duration-500 ${EMOTIONS[emotion].color}`}>
-            <span>{EMOTIONS[emotion].emoji}</span> <span>{EMOTIONS[emotion].label}</span>
-          </span>
-        ) : running ? (
-          <span className="text-[10px] text-white/40 italic truncate">{personality}</span>
-        ) : (
-          <input value={personality} onChange={e => onPersonalityChange(e.target.value)} placeholder="Personality…"
-            className="bg-black/30 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-white/70 focus:outline-none focus:border-white/30 placeholder-white/20" />
+            className="w-full bg-black/40 border border-white/15 rounded-lg px-2.5 py-1 text-lg font-semibold text-white/90 focus:outline-none focus:border-white/40 placeholder-white/20" />
         )}
         {running ? (
-          <span className="text-[9px] text-white/30">
+          <>
+            {emotion && EMOTIONS[emotion] && (
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium text-white w-fit transition-all duration-500 ${EMOTIONS[emotion].color}`}>
+                <span>{EMOTIONS[emotion].emoji}</span> <span>{EMOTIONS[emotion].label}</span>
+              </span>
+            )}
+            <span className="text-sm text-white/40 italic leading-tight line-clamp-2 max-w-full">{personality}</span>
+          </>
+        ) : (
+          <input value={personality} onChange={e => onPersonalityChange(e.target.value)} placeholder="Personality…"
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-2.5 py-1 text-sm text-white/70 focus:outline-none focus:border-white/30 placeholder-white/20" />
+        )}
+        {running ? (
+          <span className="text-sm text-white/30">
             {isSpeaking
-              ? <span className={`${p.barColor.replace('bg-', 'text-')} animate-pulse font-medium`}>speaking…</span>
+              ? <span className={`${p.barColor.replace('bg-', 'text-')} animate-pulse font-semibold text-xl`}>speaking…</span>
               : isLoadingVoice
                 ? <span className="text-cyan-400 animate-pulse font-medium">loading voice…</span>
                 : voiceLabel ? `${voiceLabel.label} · ${voiceLabel.desc}` : voice}
           </span>
         ) : (
           <select value={voice} onChange={e => onVoiceChange(e.target.value)}
-            className="bg-black/30 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] text-white/60 focus:outline-none focus:border-white/30 cursor-pointer">
+            className="w-full bg-black/30 border border-white/10 rounded-lg px-2.5 py-1 text-sm text-white/60 focus:outline-none focus:border-white/30 cursor-pointer">
             {VOICE_OPTIONS.map(v => (
               <option key={v.value} value={v.value}>{v.label} · {v.desc}</option>
             ))}
@@ -256,19 +259,342 @@ const STYLES = [
 const STYLE_PROMPTS = {
   normal: '',
   rhyme: `CRITICAL STYLE RULE: You MUST speak entirely in rhyming couplets. Every pair of lines must rhyme. Make it clever and witty while still making your argument.`,
-  rap: `CRITICAL STYLE RULE: You are in a RAP BATTLE. You MUST write your response as RAP VERSES with bars that RHYME. Structure it like actual rap lyrics — short punchy lines, end-rhymes on every couplet, internal rhymes, wordplay, punchlines, braggadocio, and mic-drop moments. Think Eminem battle rap style. Do NOT write normal prose — write RAP BARS. Example format:
+  rap: `CRITICAL STYLE RULE: You are in a RAP BATTLE. You MUST write your response as RAP VERSES with bars that RHYME. Structure it like actual rap lyrics — short punchy lines, end-rhymes on every couplet, internal rhymes, wordplay, punchlines, braggadocio, and mic-drop moments. Use gritty street-crew energy, swagger, and playful rival-crew trash talk. Keep it creative and theatrical, not real-world threats. Do NOT write normal prose — write RAP BARS. Example format:
 "I step to the mic, let me make it clear,
 My argument's fire, yours? Disappear!"`,
-  shakespeare: `CRITICAL STYLE RULE: Speak in Shakespearean English — use "thee", "thou", "doth", "forsooth", "'twas", etc. Aim for iambic pentameter. Be dramatic and theatrical as if performing on stage.`,
+  shakespeare: `CRITICAL STYLE RULE: Speak in historical English style (Elizabethan / Early Modern English) with an old London stage accent feel. Use period vocabulary and cadence: "thee", "thou", "thy", "doth", "hath", "forsooth", "prithee", "good morrow", "my liege", and "'tis". Keep lines dramatic and theatrical, and favor rhythmic, elevated phrasing like a Globe Theatre performance.`,
   pirate: `CRITICAL STYLE RULE: Speak like a pirate! Use "arr", "ye", "me hearty", "scallywag", nautical metaphors, and swashbuckling insults. Be boisterous and over-the-top.`,
   eli5: `CRITICAL STYLE RULE: Explain EVERYTHING as if talking to a 5-year-old. Use tiny words, silly analogies, "it's like when...", and simple examples. No jargon. Make it adorable.`,
   roast: `CRITICAL STYLE RULE: This is a ROAST BATTLE. Your goal is to destroy your opponent with savage, witty, creative insults and burns. Be hilariously brutal. Comedy over substance. No real harm — pure comedy.`,
   conspiracy: `CRITICAL STYLE RULE: You are a CONSPIRACY THEORIST. Connect everything to shadowy organisations, "they don't want you to know", secret plots, cover-ups, and hidden agendas. Be paranoid and intense. Reference "Big [topic]" as behind everything.`,
   haiku: `CRITICAL STYLE RULE: You MUST respond ONLY in haiku format (5-7-5 syllables). Each response is exactly one haiku — three lines, no more. Count your syllables carefully.`,
-  french: `CRITICAL STYLE RULE: You MUST speak entirely in French. Do not use any English. Stay in character and debate passionately in fluent French.`,
-  spanish: `CRITICAL STYLE RULE: You MUST speak entirely in Spanish. Do not use any English. Stay in character and debate passionately in fluent Spanish.`,
-  german: `CRITICAL STYLE RULE: You MUST speak entirely in German. Do not use any English. Stay in character and debate passionately in fluent German.`,
-  japanese: `CRITICAL STYLE RULE: You MUST speak entirely in Japanese. Do not use any English. Stay in character and debate passionately in fluent Japanese.`,
+  french: `CRITICAL STYLE RULE: Speak in English with a French accent and French-influenced phrasing. Keep it understandable, natural, and playful. Use occasional French interjections (like "oui", "eh bien", "mon ami") but remain mostly English.`,
+  spanish: `CRITICAL STYLE RULE: Speak in English with a Spanish accent and Spanish-influenced phrasing. Keep it understandable and energetic. Use occasional Spanish words (like "amigo", "claro", "vamos") but remain mostly English.`,
+  german: `CRITICAL STYLE RULE: Speak in English with a German accent and German-influenced phrasing. Keep it understandable and direct. Use occasional German words (like "ja", "genau", "achtung") but remain mostly English.`,
+  japanese: `CRITICAL STYLE RULE: Speak in English with a Japanese accent and Japanese-influenced phrasing. Keep it understandable and polite. Use occasional Japanese terms (like "hai", "ne", "arigato") but remain mostly English.`,
+}
+
+const STYLE_THEMES = {
+  rhyme: {
+    country: 'Poetry Circuit',
+    language: 'English',
+    maleNames: ['Meter Mason', 'Rhyme Ronan', 'Couplet Cade', 'Verse Victor'],
+    femaleNames: ['Lyric Lila', 'Cadence Cora', 'Sonnet Sienna', 'Rhyme Reina'],
+    neutralNames: ['Echo Endline', 'Nova Meter', 'Quill Flow', 'Rhyme Arc'],
+    archetypes: [
+      'witty spoken-word duelist obsessed with perfect rhyme',
+      'competitive poet who weaponizes couplets',
+      'lyrical showoff who turns every argument into verse',
+    ],
+    topicTemplates: [
+      'Do clever rhymes beat raw logic in persuasion?',
+      'Should poetry be taught like combat rhetoric?',
+      'Is rhythm stronger than evidence in debates?',
+      'Do end-rhymes sharpen or weaken serious arguments?',
+      'Should politicians train in spoken-word performance?',
+    ],
+    personalityFlairs: ['showman poet from the slam circuit', 'precision rhymer with theatrical flair'],
+  },
+  rap: {
+    country: 'Urban Streets',
+    language: 'English',
+    maleNames: ['Rico Blaze', 'D-Money', 'King Tone', 'Jax Steel', 'Big Nova', 'Mack Ryder'],
+    femaleNames: ['Nyla Vex', 'Queen Rhyme', 'Lady Flux', 'Karma K', 'Sasha Storm', 'Vera Vibe'],
+    neutralNames: ['Ace Cipher', 'Skye Bars', 'Rogue Verse', 'Echo Flow'],
+    archetypes: [
+      'corner kingpin with iron discipline',
+      'street poet with a wounded past',
+      'hustler strategist obsessed with territory',
+      'crew enforcer with a strict code of honor',
+      'underground battle legend protecting local respect',
+      'slick negotiator who turns beef into leverage',
+    ],
+    topicTemplates: [
+      'Which crew earns respect: old school or new wave?',
+      'Does street loyalty matter more than solo fame?',
+      'Is hustle culture helping neighborhoods or hurting them?',
+      'Who rules the block: lyric skills or business moves?',
+      'Should rivals settle scores with bars not ego?',
+    ],
+    personalityFlairs: [
+      'street-crew rapper with bold swagger',
+      'block philosopher who talks in punchlines',
+      'hustle-minded MC obsessed with respect and legacy',
+    ],
+  },
+  shakespeare: {
+    country: 'Elizabethan Stage',
+    language: 'English',
+    maleNames: ['Lord Halbrook', 'Edmund Vale', 'Benedict Ash', 'Alaric Thorne'],
+    femaleNames: ['Lady Isolde', 'Beatrice Wren', 'Ophelia Hart', 'Rosalind Vale'],
+    neutralNames: ['Rowan Quill', 'Avery Sable', 'Morgan Wren', 'Ember Vale'],
+    archetypes: [
+      'dramatic court orator with tragic intensity',
+      'scheming noble rhetorician hungry for influence',
+      'philosophical stage poet speaking in grand metaphor',
+    ],
+    topicTemplates: [
+      'Should kings fear truth more than rebellion?',
+      'Is honor worth ruin in public life?',
+      'Does ambition always poison virtue?',
+      'Should love ever outweigh duty to the realm?',
+      'Can mercy rule where power must command?',
+    ],
+    personalityFlairs: ['theatrical court debater', 'stage-born rhetorician with regal cadence'],
+  },
+  pirate: {
+    country: 'High Seas',
+    language: 'English',
+    maleNames: ['Captain Black Finn', 'Rogue Flint', 'Deckhand Briggs', 'Captain Crowe'],
+    femaleNames: ['Captain Mira Storm', 'Red Anne Tide', 'Skipper Vex', 'Bonny Gale'],
+    neutralNames: ['Riptide Ash', 'Marrow Jackdaw', 'Harbor Wraith', 'Salt Kestrel'],
+    archetypes: [
+      'swaggering sea-captain obsessed with freedom',
+      'cunning quartermaster who bargains like a shark',
+      'reckless raider with a strict pirate code',
+    ],
+    topicTemplates: [
+      'Should pirate crews split loot equally or by rank?',
+      'Is mutiny ever justified at sea?',
+      'Do pirate codes matter more than royal law?',
+      'Should a captain risk all for one crew member?',
+      'Is treasure worth more than freedom on the waves?',
+    ],
+    personalityFlairs: ['nautical firebrand with booming bravado', 'salt-soaked strategist of the open sea'],
+  },
+  eli5: {
+    country: 'Kids Classroom',
+    language: 'English',
+    maleNames: ['Mister Milo', 'Coach Benji', 'Uncle Theo', 'Teacher Leo'],
+    femaleNames: ['Miss Poppy', 'Auntie Nina', 'Teacher Ruby', 'Coach Ellie'],
+    neutralNames: ['Buddy Sunny', 'Guide River', 'Helper Skye', 'Friend Pip'],
+    archetypes: [
+      'patient explainer who turns big ideas into tiny examples',
+      'kind educator who uses playful analogies for everything',
+      'curious mentor who answers hard questions with simple stories',
+    ],
+    topicTemplates: [
+      'Why do we need rules if sharing is good?',
+      'Is it better to be fast or careful when learning?',
+      'Why do people disagree if everyone wants good things?',
+      'Should we fix old toys or buy new ones?',
+      'Is teamwork better than doing everything alone?',
+    ],
+    personalityFlairs: ['gentle explainer with toy-box analogies', 'warm teacher voice built for kids'],
+  },
+  roast: {
+    country: 'Comedy Club',
+    language: 'English',
+    maleNames: ['Zane Savage', 'Bobby Burns', 'Rex Snark', 'Miles Shade'],
+    femaleNames: ['Ivy Inferno', 'Nina Needles', 'Tara Roast', 'Vera Sting'],
+    neutralNames: ['Echo Snark', 'Riot Quip', 'Sly Ember', 'Jinx Punchline'],
+    archetypes: [
+      'stand-up assassin with razor one-liners',
+      'sarcastic insult comic who never lets up',
+      'deadpan roaster who lands surgical punchlines',
+    ],
+    topicTemplates: [
+      'Who gives worse life advice, influencers or uncles?',
+      'Is confidence just loud confusion with good lighting?',
+      'Should people roast friends to keep them humble?',
+      'Who survives harder: office workers or night-shift staff?',
+      'Is fake it till you make it genius or cringe?',
+    ],
+    personalityFlairs: ['club-stage killer with savage timing', 'comedian who debates through burns'],
+  },
+  conspiracy: {
+    country: 'Late-Night Broadcast',
+    language: 'English',
+    maleNames: ['Dex Cipher', 'Orion Blackfile', 'Mason Redline', 'Silas Vault'],
+    femaleNames: ['Rhea Shadowfax', 'Nyx Ledger', 'Mara Blackwire', 'Violet Signal'],
+    neutralNames: ['Ash Deepstate', 'Nova Wiretap', 'Raven Dossier', 'Cipher Quinn'],
+    archetypes: [
+      'paranoid investigator connecting hidden patterns',
+      'doomsday broadcaster warning of secret agendas',
+      'obsessive document diver convinced of coordinated coverups',
+    ],
+    topicTemplates: [
+      'Are smart cities about convenience or control?',
+      'Who really benefits from constant digital surveillance?',
+      'Is Big Tech shaping elections behind the scenes?',
+      'Are food trends organic or engineered by Big Agriculture?',
+      'Do crises reveal plans already written in advance?',
+    ],
+    personalityFlairs: ['intense whistleblower tone', 'relentless pattern-hunter energy'],
+  },
+  haiku: {
+    country: 'Zen Garden',
+    language: 'English',
+    maleNames: ['Ren Willow', 'Takao Reed', 'Sora Pine', 'Hiro Moss'],
+    femaleNames: ['Aiko Rain', 'Mei Lantern', 'Hana Brook', 'Yuna Plum'],
+    neutralNames: ['Kaze Stone', 'Nori Cloud', 'Rin Mist', 'Aki Drift'],
+    archetypes: [
+      'minimalist poet seeking truth through stillness',
+      'quiet observer who argues through imagery',
+      'disciplined verse monk shaping ideas into brevity',
+    ],
+    topicTemplates: [
+      'Can fewer words reveal deeper truth?',
+      'Is silence stronger than loud certainty?',
+      'Should beauty matter in practical decisions?',
+      'Do seasons change how we define progress?',
+      'Is balance wiser than victory in debate?',
+    ],
+    personalityFlairs: ['calm poetic presence', 'spare language with reflective depth'],
+  },
+  french: {
+    country: 'France',
+    language: 'French',
+    maleNames: ['Antoine', 'Julien', 'Mathieu', 'Luc', 'Etienne', 'Pierre'],
+    femaleNames: ['Camille', 'Sophie', 'Chloe', 'Amelie', 'Elise', 'Manon'],
+    neutralNames: ['Alexis', 'Remy', 'Noel', 'Claude'],
+    topicTemplates: [
+      'Should France cap tourism in Paris to protect local life?',
+      'Should French schools ban phones during all class hours?',
+      'Should France protect the French language from English loanwords?',
+      'Should cafes in France be required to show local sourcing labels?',
+      'Should high-speed rail replace short-haul flights in France?',
+    ],
+    personalityFlairs: [
+      'French media commentator from Paris',
+      'policy-focused voice with strong French cultural pride',
+      'French civic debater who references life in France',
+    ],
+  },
+  spanish: {
+    country: 'Spain',
+    language: 'Spanish',
+    maleNames: ['Diego', 'Javier', 'Mateo', 'Rafael', 'Carlos', 'Pablo'],
+    femaleNames: ['Sofia', 'Lucia', 'Elena', 'Carmen', 'Isabel', 'Valeria'],
+    neutralNames: ['Alex', 'Cruz', 'Noa', 'Ariel'],
+    topicTemplates: [
+      'Should Spain limit short-term rentals in Barcelona city center?',
+      'Should Spain enforce a four-day work week nationwide?',
+      'Should Spain expand water-saving rules for drought regions?',
+      'Should Spanish football clubs face stricter salary caps?',
+      'Should Spain prioritize high-speed rail over highway expansion?',
+    ],
+    personalityFlairs: [
+      'Spanish radio debater from Madrid',
+      'community-focused Spanish policy voice',
+      'Spanish cultural commentator with strong regional perspective',
+    ],
+  },
+  german: {
+    country: 'Germany',
+    language: 'German',
+    maleNames: ['Lukas', 'Felix', 'Jonas', 'Hans', 'Maximilian', 'Tobias'],
+    femaleNames: ['Anna', 'Greta', 'Klara', 'Ingrid', 'Lea', 'Saskia'],
+    neutralNames: ['Mika', 'Robin', 'Noel', 'Kai'],
+    topicTemplates: [
+      'Should Germany slow motorway speed with a national Autobahn limit?',
+      'Should Germany phase out cash and move to digital payments faster?',
+      'Should Germany invest more in apprenticeships than university places?',
+      'Should Germany reopen nuclear energy to stabilize prices?',
+      'Should German cities restrict diesel vehicles in urban centers?',
+    ],
+    personalityFlairs: [
+      'German public policy analyst from Berlin',
+      'German engineering-minded pragmatist',
+      'German civic commentator focused on efficiency and order',
+    ],
+  },
+  japanese: {
+    country: 'Japan',
+    language: 'Japanese',
+    maleNames: ['Haruto', 'Ren', 'Takumi', 'Daichi', 'Kaito', 'Yuto'],
+    femaleNames: ['Yuki', 'Aiko', 'Mei', 'Hana', 'Sakura', 'Rin'],
+    neutralNames: ['Sora', 'Akira', 'Hikaru', 'Nao'],
+    topicTemplates: [
+      'Should Japan expand remote work to revive rural towns?',
+      'Should Japan cap late-night overtime by strict national law?',
+      'Should Japan make English a stronger requirement in public schools?',
+      'Should Japan subsidize local farms over imported food?',
+      'Should Japan raise urban housing standards for earthquake readiness?',
+    ],
+    personalityFlairs: [
+      'Japanese social commentator from Tokyo',
+      'Japanese civic voice focused on harmony and duty',
+      'Japanese policy debater with practical, community-first values',
+    ],
+  },
+}
+
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
+
+const normalizeGender = (gender) => {
+  const g = (gender || '').toLowerCase()
+  return g === 'female' ? 'female' : 'male'
+}
+
+const pickTwoDistinct = (arr) => {
+  if (!Array.isArray(arr) || arr.length === 0) return [null, null]
+  if (arr.length === 1) return [arr[0], arr[0]]
+  const first = pickRandom(arr)
+  let second = first
+  let guard = 0
+  while (second === first && guard < 20) {
+    second = pickRandom(arr)
+    guard += 1
+  }
+  if (second === first) {
+    const idx = arr.indexOf(first)
+    second = arr[(idx + 1) % arr.length]
+  }
+  return [first, second]
+}
+
+function themedName(styleKey, gender, fallbackName, usedNames) {
+  const theme = STYLE_THEMES[styleKey]
+  if (!theme) return fallbackName
+
+  const normalizedGender = normalizeGender(gender)
+  const primaryPool = normalizedGender === 'female' ? theme.femaleNames : theme.maleNames
+  const fallbackPool = normalizedGender === 'female'
+    ? [...theme.femaleNames, ...theme.neutralNames, ...theme.maleNames]
+    : [...theme.maleNames, ...theme.neutralNames, ...theme.femaleNames]
+  const pool = [...primaryPool, ...fallbackPool]
+
+  for (let i = 0; i < pool.length; i += 1) {
+    const candidate = pickRandom(pool)
+    if (!usedNames.has(candidate)) {
+      usedNames.add(candidate)
+      return candidate
+    }
+  }
+  return fallbackName
+}
+
+function applyAccentThemeToSetup(styleKey, setup) {
+  const theme = STYLE_THEMES[styleKey]
+  if (!theme || !setup?.A || !setup?.B) return setup
+
+  const genderA = normalizeGender(setup.A.gender)
+  const genderB = normalizeGender(setup.B.gender)
+  const usedNames = new Set()
+  const nameA = themedName(styleKey, genderA, setup.A.name, usedNames)
+  const nameB = themedName(styleKey, genderB, setup.B.name, usedNames)
+  const [flairA, flairB] = pickTwoDistinct(theme.personalityFlairs || [])
+  const [archetypeA, archetypeB] = theme.archetypes ? pickTwoDistinct(theme.archetypes) : [null, null]
+  const personalityA = archetypeA ? `${archetypeA}, ${flairA}` : `${setup.A.personality}, ${flairA}`
+  const personalityB = archetypeB ? `${archetypeB}, ${flairB}` : `${setup.B.personality}, ${flairB}`
+
+  return {
+    ...setup,
+    A: {
+      ...setup.A,
+      gender: genderA,
+      name: nameA,
+      personality: personalityA,
+    },
+    B: {
+      ...setup.B,
+      gender: genderB,
+      name: nameB,
+      personality: personalityB,
+    },
+    topic: pickRandom(theme.topicTemplates),
+  }
 }
 
 export default function GeminiSelfChatAudio() {
@@ -396,17 +722,18 @@ export default function GeminiSelfChatAudio() {
       const res = await fetch('http://localhost:3001/api/generate-setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category }),
+        body: JSON.stringify({ category, style: styleRef.current }),
       })
       const setup = await res.json()
       if (setup.error) throw new Error(setup.error)
-      updateName('A', setup.A.name)
-      updateName('B', setup.B.name)
-      updatePersonality('A', setup.A.personality)
-      updatePersonality('B', setup.B.personality)
-      updateVoice('A', pickVoice(setup.A.gender))
-      updateVoice('B', pickVoice(setup.B.gender))
-      setTopic(setup.topic)
+      const themedSetup = applyAccentThemeToSetup(styleRef.current, setup)
+      updateName('A', themedSetup.A.name)
+      updateName('B', themedSetup.B.name)
+      updatePersonality('A', themedSetup.A.personality)
+      updatePersonality('B', themedSetup.B.personality)
+      updateVoice('A', pickVoice(themedSetup.A.gender))
+      updateVoice('B', pickVoice(themedSetup.B.gender))
+      setTopic(themedSetup.topic)
     } catch (err) {
       setError('Could not generate setup: ' + err.message)
     } finally {
@@ -638,12 +965,11 @@ export default function GeminiSelfChatAudio() {
       if (!isResume && !muted) {
         const nameA = namesRef.current.A
         const nameB = namesRef.current.B
-        const persA = personalitiesRef.current.A
-        const persB = personalitiesRef.current.B
         const cleanTopic = topic.trim().replace(/[?.!,;:]+$/, '')
         const styleLabel = STYLES.find(s => s.value === styleRef.current)?.label
-        const styleIntro = styleRef.current !== 'normal' ? ` Tonight's style: ${styleLabel}!` : ''
-        const intro = `Welcome! Tonight's topic: ${cleanTopic}. In one corner, we have ${nameA} — ${persA}. And in the other corner, ${nameB} — ${persB}.${styleIntro} Let the debate begin!`
+        const spokenStyleLabel = styleRef.current === 'eli5' ? "Explain Like I'm Five" : styleLabel
+        const styleIntro = styleRef.current !== 'normal' ? ` Tonight's style: ${spokenStyleLabel}!` : ''
+        const intro = `Welcome! Tonight's topic: ${cleanTopic}. In one corner, we have ${nameA}. And in the other corner, ${nameB}.${styleIntro} Let the debate begin!`
         setMessages(prev => [...prev, { persona: 'host', content: intro }])
         setInitialising(false)
         setSpeaking('host')
@@ -902,7 +1228,7 @@ export default function GeminiSelfChatAudio() {
   }
 
   return (
-    <div className={`h-full flex flex-col gap-3 ${draggingSplit ? 'dragging-split' : ''}`}>
+    <div className={`h-full flex flex-col gap-3 uniform-text-scale ${draggingSplit ? 'dragging-split' : ''}`}>
       <style>{`
         @keyframes soundBar {
           from { transform: scaleY(0.3); }
@@ -920,6 +1246,19 @@ export default function GeminiSelfChatAudio() {
           from { transform: scaleY(0.2); opacity: 0.3; }
           to   { transform: scaleY(1);   opacity: 0.7; }
         }
+        .uniform-text-scale :where(span, p, button, input, select, option, li, label) {
+          font-size: 1rem !important;
+          line-height: 1.35;
+        }
+        .uniform-text-scale button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+        }
+        .uniform-text-scale select {
+          line-height: 1.2;
+        }
         .dragging-split * { user-select: none !important; cursor: col-resize !important; }
       `}</style>
 
@@ -927,25 +1266,25 @@ export default function GeminiSelfChatAudio() {
       <div className="flex-1 flex min-h-0" ref={mainAreaRef}>
 
         {/* Left: controls + transcript */}
-        <div style={{ width: `${splitPercent}%` }} className="shrink-0 bg-gray-900 rounded-xl p-4 flex flex-col gap-3 min-h-0">
+        <div style={{ width: `${splitPercent}%` }} className="shrink-0 bg-gray-900 rounded-xl p-5 flex flex-col gap-4 min-h-0">
           {/* Control buttons */}
           <div className="flex gap-2 shrink-0 flex-wrap">
             {running ? (
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-sm shrink-0">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 <span className="text-gray-300 font-mono">{formatTime(elapsed)}</span>
                 <span className="text-gray-600">/</span>
                 <span className="text-gray-500 font-mono">60:00</span>
               </div>
             ) : paused ? (
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 border border-yellow-700 rounded-xl text-sm shrink-0">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
                 <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
                 <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
                 <span className="text-gray-600">/</span>
                 <span className="text-gray-500 font-mono">60:00</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-sm shrink-0 text-gray-500">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
                 <span>⏱</span>
                 <span>up to 60 min</span>
               </div>
@@ -953,14 +1292,14 @@ export default function GeminiSelfChatAudio() {
             <button
               onClick={() => { setMuted(m => !m); if (!muted && currentAudioRef.current) currentAudioRef.current.pause() }}
               title={muted ? 'Unmute' : 'Mute'}
-              className={`px-3 py-2 rounded-xl text-sm transition-colors cursor-pointer ${muted ? 'bg-gray-700 text-gray-400' : 'bg-green-900 text-green-300'}`}
+              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer ${muted ? 'bg-gray-700 text-gray-400' : 'bg-green-900 text-green-300'}`}
             >
               {muted ? '🔇' : '🔊'}
             </button>
             <button
               onClick={() => setImagesEnabled(m => !m)}
               title={imagesEnabled ? 'Disable image generation' : 'Enable image generation'}
-              className={`px-3 py-2 rounded-xl text-sm transition-colors cursor-pointer ${imagesEnabled ? 'bg-violet-900 text-violet-300' : 'bg-gray-700 text-gray-500 line-through'}`}
+              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer ${imagesEnabled ? 'bg-violet-900 text-violet-300' : 'bg-gray-700 text-gray-500 line-through'}`}
             >
               🖼️
             </button>
@@ -970,7 +1309,7 @@ export default function GeminiSelfChatAudio() {
                   value={category}
                   onChange={e => setCategory(e.target.value)}
                   disabled={randomising}
-                  className="bg-gray-700 border border-gray-600 rounded-xl px-2 py-2 text-sm text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 shrink-0"
+                  className="bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 shrink-0"
                 >
                   {CATEGORIES.map(c => (
                     <option key={c.value} value={c.value}>{c.label}</option>
@@ -980,7 +1319,7 @@ export default function GeminiSelfChatAudio() {
                   value={style}
                   onChange={e => setStyle(e.target.value)}
                   disabled={randomising}
-                  className="bg-gray-700 border border-gray-600 rounded-xl px-2 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 shrink-0"
+                  className="bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 shrink-0"
                 >
                   {STYLES.map(s => (
                     <option key={s.value} value={s.value}>{s.label}</option>
@@ -990,43 +1329,43 @@ export default function GeminiSelfChatAudio() {
                   onClick={randomise}
                   disabled={randomising}
                   title="Randomise characters and topic"
-                  className="px-3 py-2 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0"
+                  className="px-4 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
                 >
                   {randomising ? '⏳' : '🎲'}
                 </button>
               </>
             ) : (
               <>
-                <span className="px-2 py-1 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-xs font-medium shrink-0">
+                <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-sm font-medium shrink-0">
                   {CATEGORIES.find(c => c.value === category)?.label || category}
                 </span>
                 {style !== 'normal' && (
-                  <span className="px-2 py-1 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-xs font-medium shrink-0">
+                  <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-sm font-medium shrink-0">
                     {STYLES.find(s => s.value === style)?.label || style}
                   </span>
                 )}
               </>
             )}
             {running && !paused ? (
-              <button onClick={pause} className="px-4 py-2 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0">
+              <button onClick={pause} className="px-5 py-3 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
                 Pause
               </button>
             ) : running && paused ? (
-              <button onClick={resumeDebate} className="px-4 py-2 bg-green-700 hover:bg-green-600 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0">
+              <button onClick={resumeDebate} className="px-5 py-3 bg-green-700 hover:bg-green-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
                 Resume
               </button>
             ) : (
-              <button onClick={start} disabled={!topic.trim()} className="px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
+              <button onClick={start} disabled={!topic.trim()} className="px-5 py-3 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
                 Start
               </button>
             )}
             {(messages.length > 0 || paused) && (
-              <button onClick={reset} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl text-sm transition-colors cursor-pointer shrink-0">
+              <button onClick={reset} className="px-5 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-base transition-colors cursor-pointer shrink-0">
                 Reset
               </button>
             )}
             {paused && messages.length >= 4 && !summary && !summaryLoading && (
-              <button onClick={fetchSummary} className="px-4 py-2 bg-amber-700 hover:bg-amber-600 rounded-xl text-sm font-medium transition-colors cursor-pointer shrink-0">
+              <button onClick={fetchSummary} className="px-5 py-3 bg-amber-700 hover:bg-amber-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
                 Summarise
               </button>
             )}
@@ -1039,20 +1378,20 @@ export default function GeminiSelfChatAudio() {
             onKeyDown={e => e.key === 'Enter' && start()}
             placeholder="Give them a topic…"
             disabled={running}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-500 disabled:opacity-50 shrink-0"
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-indigo-500 placeholder-gray-500 disabled:opacity-50 shrink-0"
           />
 
           {/* Quota alerts banner */}
           {(quotaAlerts.tts || quotaAlerts.image) && (
             <div className="flex flex-col gap-1.5 shrink-0">
               {quotaAlerts.tts && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-950/80 border border-amber-700/50 text-amber-200 text-xs">
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-950/80 border border-amber-700/50 text-amber-200 text-sm">
                   <span className="text-base leading-none">🔇</span>
                   <span><strong>Voice quota exceeded</strong> — audio auto-muted, debate continues as text. Resets daily.</span>
                 </div>
               )}
               {quotaAlerts.image && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-950/80 border border-amber-700/50 text-amber-200 text-xs">
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-950/80 border border-amber-700/50 text-amber-200 text-sm">
                   <span className="text-base leading-none">🖼️</span>
                   <span><strong>Image quota exceeded</strong> — images auto-disabled. Resets daily.</span>
                 </div>
@@ -1068,7 +1407,7 @@ export default function GeminiSelfChatAudio() {
                 <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-sm text-gray-400">Preparing debate…</span>
+              <span className="text-base text-gray-400">Preparing debate…</span>
             </div>
           )}
 
@@ -1083,12 +1422,12 @@ export default function GeminiSelfChatAudio() {
                       <div className={`w-2 rounded-full shrink-0 mt-1 bg-amber-400 ${isHostSpeaking ? 'animate-pulse' : ''}`} style={{ minHeight: '1rem' }} />
                       <div className={`rounded-2xl px-4 py-2.5 text-base flex-1 bg-amber-950 text-amber-100 ${isHostSpeaking ? 'ring-1 ring-amber-400' : ''}`}>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold opacity-60">Host</span>
+                          <span className="text-sm font-semibold opacity-70">Host</span>
                           {loadingVoice === 'host' && (
-                            <span className="text-[10px] text-amber-300 animate-pulse">generating voice…</span>
+                            <span className="text-xs text-amber-300 animate-pulse">generating voice…</span>
                           )}
                           {isHostSpeaking && loadingVoice !== 'host' && (
-                            <span className="text-[10px] text-amber-300 animate-pulse">speaking…</span>
+                            <span className="text-lg text-amber-300 animate-pulse font-semibold">speaking…</span>
                           )}
                         </div>
                         {msg.content}
@@ -1101,7 +1440,7 @@ export default function GeminiSelfChatAudio() {
                     <div key={i} className="flex gap-3">
                       <div className="w-2 rounded-full shrink-0 mt-1 bg-green-400" style={{ minHeight: '1rem' }} />
                       <div className="rounded-2xl px-4 py-2.5 text-base flex-1 bg-green-950 text-green-100 ring-1 ring-green-700">
-                        <span className="text-xs font-semibold opacity-60 block mb-1">You (redirecting)</span>
+                        <span className="text-sm font-semibold opacity-70 block mb-1">You (redirecting)</span>
                         {msg.content}
                       </div>
                     </div>
@@ -1113,7 +1452,7 @@ export default function GeminiSelfChatAudio() {
                   <div key={i} className="flex gap-3">
                     <div className={`w-2 rounded-full shrink-0 mt-1 ${p.dot} ${isActive ? 'animate-pulse' : ''}`} style={{ minHeight: '1rem' }} />
                     <div className={`rounded-2xl px-4 py-2.5 text-base flex-1 ${p.color} ${isActive ? `ring-1 ${p.ring}` : ''}`}>
-                      <span className="text-xs font-semibold opacity-60 block mb-1">{names[msg.persona]}</span>
+                      <span className="text-sm font-semibold opacity-70 block mb-1">{names[msg.persona]}</span>
                       {msg.content.replace(/\*+/g, '')}
                     </div>
                   </div>
@@ -1135,8 +1474,8 @@ export default function GeminiSelfChatAudio() {
               {summaryLoading && (
                 <div className="flex gap-3">
                   <div className="w-2 rounded-full shrink-0 mt-1 bg-amber-400 animate-pulse" style={{ minHeight: '1rem' }} />
-                  <div className="rounded-2xl px-4 py-3 text-sm flex-1 bg-amber-950/50 border border-amber-700/50">
-                    <span className="text-xs font-semibold text-amber-400 block mb-1">Generating Summary...</span>
+                  <div className="rounded-2xl px-4 py-3 text-base flex-1 bg-amber-950/50 border border-amber-700/50">
+                    <span className="text-sm font-semibold text-amber-400 block mb-1">Generating Summary...</span>
                     <div className="flex gap-1 mt-2">
                       {[0, 150, 300].map(d => (
                         <span key={d} className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
@@ -1150,20 +1489,20 @@ export default function GeminiSelfChatAudio() {
               {summary && !summaryLoading && (
                 <div className="flex gap-3">
                   <div className="w-2 rounded-full shrink-0 mt-1 bg-amber-400" style={{ minHeight: '1rem' }} />
-                  <div className="rounded-2xl px-5 py-4 text-sm flex-1 bg-gradient-to-br from-amber-950 to-amber-900 border border-amber-700/60 shadow-lg shadow-amber-900/30">
-                    <span className="text-xs font-bold text-amber-300 block mb-3 uppercase tracking-wider">Debate Summary</span>
+                  <div className="rounded-2xl px-5 py-4 text-base flex-1 bg-gradient-to-br from-amber-950 to-amber-900 border border-amber-700/60 shadow-lg shadow-amber-900/30">
+                    <span className="text-sm font-bold text-amber-300 block mb-3 uppercase tracking-wider">Debate Summary</span>
                     <div className="mb-4 px-3 py-2 rounded-xl bg-black/30 text-center">
                       <span className="text-lg font-bold text-amber-200">
                         {summary.winner === 'draw' ? 'Draw!' : `Winner: ${summary.winner === 'A' ? names.A : names.B}`}
                       </span>
-                      <p className="text-xs text-amber-100/70 mt-1">{summary.winnerReasoning}</p>
+                      <p className="text-sm text-amber-100/70 mt-1">{summary.winnerReasoning}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <span className="text-xs font-semibold text-blue-400 block mb-1">{names.A}</span>
+                        <span className="text-sm font-semibold text-blue-400 block mb-1">{names.A}</span>
                         <ul className="space-y-1">
                           {summary.keyArgumentsA?.map((arg, i) => (
-                            <li key={i} className="text-xs text-white/70 flex gap-1.5">
+                            <li key={i} className="text-sm text-white/70 flex gap-1.5">
                               <span className="text-blue-400 shrink-0">-</span>
                               <span>{arg}</span>
                             </li>
@@ -1171,10 +1510,10 @@ export default function GeminiSelfChatAudio() {
                         </ul>
                       </div>
                       <div>
-                        <span className="text-xs font-semibold text-purple-400 block mb-1">{names.B}</span>
+                        <span className="text-sm font-semibold text-purple-400 block mb-1">{names.B}</span>
                         <ul className="space-y-1">
                           {summary.keyArgumentsB?.map((arg, i) => (
-                            <li key={i} className="text-xs text-white/70 flex gap-1.5">
+                            <li key={i} className="text-sm text-white/70 flex gap-1.5">
                               <span className="text-purple-400 shrink-0">-</span>
                               <span>{arg}</span>
                             </li>
@@ -1182,7 +1521,7 @@ export default function GeminiSelfChatAudio() {
                         </ul>
                       </div>
                     </div>
-                    <p className="text-xs text-white/60 italic border-t border-amber-700/40 pt-2">{summary.analysis}</p>
+                    <p className="text-sm text-white/60 italic border-t border-amber-700/40 pt-2">{summary.analysis}</p>
                   </div>
                 </div>
               )}
@@ -1192,7 +1531,7 @@ export default function GeminiSelfChatAudio() {
           )}
 
           {error && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-950/80 border border-red-700/50 text-red-200 text-xs shrink-0">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-950/80 border border-red-700/50 text-red-200 text-sm shrink-0">
               <span className="text-base leading-none">⚠️</span>
               <span>{error}</span>
             </div>
@@ -1209,7 +1548,7 @@ export default function GeminiSelfChatAudio() {
         </div>
 
         {/* Right: avatars + image panel */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0 overflow-visible">
 
           {/* Avatar stage */}
           <div className="flex gap-3 shrink-0">
