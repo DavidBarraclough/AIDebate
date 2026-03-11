@@ -265,6 +265,7 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, name, onNa
           </span>
         ) : (
           <select value={voice} onChange={e => onVoiceChange(e.target.value)}
+            style={{ colorScheme: 'dark' }}
             className="w-full bg-black/30 border border-white/10 rounded-lg px-2.5 py-1 text-sm text-white/60 focus:outline-none focus:border-white/30 cursor-pointer">
             {VOICE_OPTIONS.map(v => (
               <option key={v.value} value={v.value}>{v.label} · {v.desc}</option>
@@ -1505,6 +1506,7 @@ export default function GeminiSelfChatAudio() {
                   value={category}
                   onChange={e => setCategory(e.target.value)}
                   disabled={randomising}
+                  style={{ colorScheme: 'dark' }}
                   className="bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 shrink-0"
                 >
                   {CATEGORIES.map(c => (
@@ -1515,6 +1517,7 @@ export default function GeminiSelfChatAudio() {
                   value={style}
                   onChange={e => setStyle(e.target.value)}
                   disabled={randomising}
+                  style={{ colorScheme: 'dark' }}
                   className="bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 shrink-0"
                 >
                   {STYLES.map(s => (
@@ -1557,7 +1560,11 @@ export default function GeminiSelfChatAudio() {
                 Begin Session
               </button>
             )}
-            <button onClick={reset} className="px-5 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-base transition-colors cursor-pointer shrink-0">
+            <button
+              onClick={reset}
+              disabled={!running && !paused && messages.length === 0 && !topic.trim()}
+              className="px-5 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed rounded-xl text-base transition-colors cursor-pointer shrink-0"
+            >
               Reset Session
             </button>
             {paused && !summaryLoading && (
@@ -1767,7 +1774,15 @@ export default function GeminiSelfChatAudio() {
               emotion={emotions.A}
             />
             <div className="relative flex flex-col items-center justify-center gap-2 shrink-0 overflow-visible">
-              {!running && <div className="text-gray-600 text-xs font-medium">Debate</div>}
+              {!running && (
+                <div className="flex flex-col items-center gap-1.5 select-none">
+                  <span className="h-5 w-px bg-gradient-to-b from-transparent via-indigo-500/70 to-transparent" />
+                  <span className="rounded-full border border-indigo-500/40 bg-indigo-950/70 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-200 shadow-sm shadow-indigo-900/40">
+                    Debate
+                  </span>
+                  <span className="h-5 w-px bg-gradient-to-b from-transparent via-purple-500/70 to-transparent" />
+                </div>
+              )}
               {running && (
                 <button
                   onClick={handleInterrupt}
