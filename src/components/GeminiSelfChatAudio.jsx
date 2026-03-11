@@ -638,6 +638,7 @@ export default function GeminiSelfChatAudio() {
   const [splitPercent, setSplitPercent] = useState(50)
   const [draggingSplit, setDraggingSplit] = useState(false)
   const [paused, setPaused] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
   const startTimeRef = useRef(null)
   const mainAreaRef = useRef(null)
   const isDraggingRef = useRef(false)
@@ -699,6 +700,12 @@ export default function GeminiSelfChatAudio() {
     }, 1000)
     return () => clearInterval(interval)
   }, [running])
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const updateName = (persona, value) => {
     namesRef.current[persona] = value
@@ -1164,6 +1171,7 @@ export default function GeminiSelfChatAudio() {
   }
 
   const handleDividerMouseDown = (e) => {
+    if (isMobile) return
     e.preventDefault()
     isDraggingRef.current = true
     setDraggingSplit(true)
@@ -1263,10 +1271,10 @@ export default function GeminiSelfChatAudio() {
       `}</style>
 
       {/* Main area — fills full height */}
-      <div className="flex-1 flex min-h-0" ref={mainAreaRef}>
+      <div className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-0 min-h-0 overflow-y-auto lg:overflow-hidden" ref={mainAreaRef}>
 
         {/* Left: controls + transcript */}
-        <div style={{ width: `${splitPercent}%` }} className="shrink-0 bg-gray-900 rounded-xl p-5 flex flex-col gap-4 min-h-0">
+        <div style={{ width: isMobile ? '100%' : `${splitPercent}%` }} className="w-full lg:shrink-0 bg-gray-900 rounded-xl p-5 flex flex-col gap-4 min-h-[50vh] lg:min-h-0">
           {/* Control buttons */}
           <div className="flex gap-2 shrink-0 flex-wrap">
             {running ? (
@@ -1540,7 +1548,7 @@ export default function GeminiSelfChatAudio() {
 
         {/* Drag divider */}
         <div
-          className="flex items-center justify-center cursor-col-resize shrink-0 select-none group px-1"
+          className="hidden lg:flex items-center justify-center cursor-col-resize shrink-0 select-none group px-1"
           style={{ width: '12px' }}
           onMouseDown={handleDividerMouseDown}
         >
@@ -1548,10 +1556,10 @@ export default function GeminiSelfChatAudio() {
         </div>
 
         {/* Right: avatars + image panel */}
-        <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0 overflow-visible">
+        <div className="w-full flex-1 flex flex-col gap-3 min-w-0 min-h-[50vh] lg:min-h-0 overflow-visible">
 
           {/* Avatar stage */}
-          <div className="flex gap-3 shrink-0">
+          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
             <AIAvatar
               persona="A"
               isSpeaking={speaking === 'A'}
@@ -1616,7 +1624,7 @@ export default function GeminiSelfChatAudio() {
           </div>
 
           {/* Main image — fills remaining height */}
-          <div className="flex-1 bg-gray-900 rounded-xl overflow-hidden relative min-h-0">
+          <div className="flex-1 bg-gray-900 rounded-xl overflow-hidden relative min-h-[260px] lg:min-h-0">
             {!imagesEnabled ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-600">
                 <span className="text-4xl opacity-30">🖼️</span>
