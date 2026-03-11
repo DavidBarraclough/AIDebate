@@ -59,7 +59,8 @@ const VOICE_OPTIONS = [
 ]
 
 const HOST_VOICE = 'Enceladus'
-const API_BASE_URL = 'http://localhost:3001'
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim() || (import.meta.env.DEV ? 'http://localhost:3001' : '')
+const buildApiUrl = (endpoint) => API_BASE_URL ? `${API_BASE_URL}/api/${endpoint}` : `/api/${endpoint}`
 
 const TELEMETRY_ENDPOINTS = [
   'self-chat-turn',
@@ -283,7 +284,7 @@ async function fetchTTS(text, personaKey, voice, postJson, userApiKey = '') {
     return await postJson('tts', { text, persona: personaKey, voice })
   }
   const trimmedKey = String(userApiKey || '').trim()
-  const res = await fetch(`${API_BASE_URL}/api/tts`, {
+  const res = await fetch(buildApiUrl('tts'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -830,7 +831,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '' }) {
   const postJson = async (endpoint, payload) => {
     try {
       const trimmedKey = userApiKey.trim()
-      const res = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
+      const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
