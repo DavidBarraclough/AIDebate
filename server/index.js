@@ -4,7 +4,23 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import 'dotenv/config'
 
 const app = express()
-app.use(cors())
+
+const isProduction = process.env.NODE_ENV === 'production'
+const allowServerFallback = (process.env.ALLOW_SERVER_FALLBACK ?? (isProduction ? 'false' : 'true')).toLowerCase() === 'true'
+const corsOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
+
+app.use(cors({
+  origin(origin, callback) {
+    // Allow non-browser clients and same-machine tools with no Origin header.
+    if (!origin) return callback(null, true)
+    if (corsOrigins.length === 0) return callback(null, true)
+    if (corsOrigins.includes(origin)) return callback(null, true)
+    return callback(new Error('CORS not allowed'))
+  },
+}))
 app.use(express.json())
 app.use((req, _res, next) => { console.log(req.method, req.path); next() })
 
@@ -12,14 +28,17 @@ const HEADER_API_KEY = 'x-gemini-api-key'
 
 function resolveGeminiApiKey(req) {
   const headerKey = (req.get(HEADER_API_KEY) || '').trim()
-  const envKey = (process.env.GEMINI_API_KEY || '').trim()
+  const envKey = allowServerFallback ? (process.env.GEMINI_API_KEY || '').trim() : ''
   return headerKey || envKey || null
 }
 
 function requireGeminiApiKey(req, res) {
   const apiKey = resolveGeminiApiKey(req)
   if (!apiKey) {
-    res.status(400).json({ error: 'Gemini API key missing. Add your personal key in the app or configure GEMINI_API_KEY on the server.' })
+    const helpText = allowServerFallback
+      ? 'Add your personal key in the app or configure GEMINI_API_KEY on the server.'
+      : 'Add your personal key in the app. Server-side fallback key is disabled.'
+    res.status(400).json({ error: `Gemini API key missing. ${helpText}` })
     return null
   }
   return apiKey
@@ -425,4 +444,13 @@ ${transcript}`
   }
 })
 
-app.listen(3001, () => console.log('Server running on http://localhost:3001'))
+const PORT = Number(process.env.PORT) || 3001
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`)
+  console.log(`ALLOW_SERVER_FALLBACK=${allowServerFallback}`)
+  if (corsOrigins.length > 0) {
+    console.log(`CORS allowlist enabled (${corsOrigins.length} origin(s))`)
+  } else {
+    console.log('CORS allowlist disabled (all origins allowed)')
+  }
+})
