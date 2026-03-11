@@ -14,7 +14,7 @@ app.post('/api/chat', async (req, res) => {
   const { history, message } = req.body
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
 
     const chat = model.startChat({
       history: history.map(msg => ({
@@ -39,7 +39,7 @@ app.post('/api/self-chat-turn', async (req, res) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash-lite',
       systemInstruction: systemPrompt,
     })
 
@@ -113,12 +113,18 @@ app.post('/api/tts', async (req, res) => {
     )
     const data = await response.json()
     if (data.error) {
-      // If the voice name was invalid, retry with fallback voice
-      if (requestedVoice && data.error.message?.includes('generate text')) {
-        console.warn(`TTS: voice "${requestedVoice}" rejected, falling back to ${TTS_VOICES[persona] || 'Puck'}`)
+      const msg = data.error.message || ''
+      // Quota exceeded — tell frontend to auto-mute
+      if (msg.toLowerCase().includes('quota') || data.error.code === 429) {
+        console.warn('TTS quota exceeded — frontend should auto-mute')
+        return res.status(429).json({ error: msg, quotaExceeded: true })
+      }
+      // If the voice name was invalid
+      if (requestedVoice && msg.includes('generate text')) {
+        console.warn(`TTS: voice "${requestedVoice}" rejected`)
         return res.status(400).json({ error: `Voice "${requestedVoice}" is not available. Please choose another.` })
       }
-      throw new Error(data.error.message)
+      throw new Error(msg)
     }
     const audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData
     if (!audio) throw new Error('No audio returned')
@@ -165,7 +171,7 @@ app.post('/api/image', async (req, res) => {
 app.post('/api/classify-interrupt', async (req, res) => {
   const { text } = req.body
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
     const result = await model.generateContent(
       `A human moderator interrupted an AI debate and said: "${text}"
 
@@ -192,16 +198,52 @@ Examples:
 
 app.post('/api/generate-setup', async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY
+  const category = req.body?.category || 'wild-card'
+
+  const categoryPrompts = {
+    'comedy': `Category: COMEDY. Generate hilarious, absurd, over-the-top characters. Think slapstick, satire, ridiculous premises. Names should be funny or punny.
+Example: {"A":{"name":"Sir Butterfingers","personality":"catastrophically clumsy self-proclaimed villain","gender":"male"},"B":{"name":"Melodrama Maxine","personality":"absurdly dramatic and gasps at everything","gender":"female"},"topic":"Who deserves the last slice of pizza?"}`,
+
+    'intellectual': `Category: INTELLECTUAL. Generate scholarly, articulate debaters with strong academic or philosophical viewpoints. Names should sound distinguished or academic.
+Example: {"A":{"name":"Professor Whitmore","personality":"rigorously analytical Oxford scholar who cites everything","gender":"male"},"B":{"name":"Dr. Vasquez","personality":"fiery contrarian who dismantles arguments ruthlessly","gender":"female"},"topic":"Is free will an illusion created by determinism?"}`,
+
+    'ai': `Category: AI & TECHNOLOGY. Generate AI systems, robots, tech entrepreneurs, or digital beings. Names should sound techy or futuristic.
+Example: {"A":{"name":"ARIA-7","personality":"hyper-logical AI who finds humans baffling","gender":"female"},"B":{"name":"Chip","personality":"glitchy prototype robot desperate to be human","gender":"male"},"topic":"Should AI be allowed to have feelings?"}`,
+
+    'family': `Category: FAMILY. Generate family members in relatable domestic situations — parents, kids, grandparents, siblings. Names should be everyday and warm.
+Example: {"A":{"name":"Dad","personality":"strict but secretly soft overprotective father","gender":"male"},"B":{"name":"Zoe","personality":"eye-rolling rebellious teenager who knows everything","gender":"female"},"topic":"Should curfew be extended to midnight on weekends?"}`,
+
+    'scifi': `Category: SCI-FI. Generate characters from sci-fi universes — space explorers, aliens, time travellers, cyberpunk hackers. Names should be otherworldly or futuristic.
+Example: {"A":{"name":"Captain Vex","personality":"battle-hardened starship commander with trust issues","gender":"female"},"B":{"name":"Zylox","personality":"eerily calm alien diplomat hiding a secret","gender":"male"},"topic":"Should first contact protocols allow deception?"}`,
+
+    'philosophy': `Category: PHILOSOPHY. Generate deep thinkers, philosophers (real or fictional), existential characters. Names can reference real philosophers or be thematic.
+Example: {"A":{"name":"Socrates","personality":"relentlessly questioning and annoyingly Socratic","gender":"male"},"B":{"name":"Nihila","personality":"apathetic nihilist who finds meaning meaningless","gender":"female"},"topic":"Does the pursuit of happiness guarantee suffering?"}`,
+
+    'rhetoric': `Category: RHETORIC. Generate master orators, persuasion experts, political speakers, lawyers, or debate champions. Focus on eloquence, argumentation style, and persuasion tactics. Names should sound commanding or authoritative.
+Example: {"A":{"name":"Senator Blackwell","personality":"silver-tongued politician who never answers directly","gender":"male"},"B":{"name":"Advocate Priya","personality":"razor-sharp trial lawyer who demolishes weak arguments","gender":"female"},"topic":"Is persuasion just manipulation with better branding?"}`,
+
+    'politics': `Category: POLITICS. Pick two REAL current or recent politicians from the UK or USA. Use their ACTUAL full names. Base their personality on their REAL well-known political style, mannerisms, and public persona. The debate topic MUST be a real current affairs issue that these politicians have publicly clashed on or would have strong opposing views about. Think immigration, healthcare, climate policy, taxation, foreign policy, trade wars, AI regulation, etc.
+Example: {"A":{"name":"Donald Trump","personality":"bombastic America-first populist who deals in superlatives","gender":"male"},"B":{"name":"Keir Starmer","personality":"measured, forensic former lawyer turned cautious reformer","gender":"male"},"topic":"Should Western nations cut foreign aid to fund domestic priorities?"}`,
+
+    'famous': `Category: FAMOUS PEOPLE. Pick two REAL famous people from the UK or USA — politicians, actors, scientists, musicians, entrepreneurs, TV personalities, etc. Use their ACTUAL full names. Base their personality description on their REAL well-known traits, mannerisms, and public persona. The debate topic must be something both people would genuinely be knowledgeable or opinionated about given their real careers and interests. Create entertaining clashes of real personalities.
+Example: {"A":{"name":"Donald Trump","personality":"bombastic, self-aggrandising dealmaker who speaks in superlatives","gender":"male"},"B":{"name":"David Attenborough","personality":"gentle, eloquent naturalist with quiet moral authority","gender":"male"},"topic":"Should economic growth take priority over the environment?"}`,
+
+    'wild-card': `Category: WILD CARD. Generate any creative combination — mix genres, time periods, archetypes. Be surprising and unexpected. Anything goes.
+Example: {"A":{"name":"Cassandra","personality":"doom-obsessed and dramatically prophetic","gender":"female"},"B":{"name":"Rex","personality":"stubbornly optimistic and infuriatingly cheerful","gender":"male"},"topic":"Is humanity doomed or just getting started?"}`
+  }
+
+  const categoryGuide = categoryPrompts[category] || categoryPrompts['wild-card']
+
   const prompt = `Generate a creative AI debate setup. Reply with ONLY a JSON object — no markdown, no explanation, just raw JSON.
 
-Example: {"A":{"name":"Cassandra","personality":"doom-obsessed and dramatically prophetic","gender":"female"},"B":{"name":"Rex","personality":"stubbornly optimistic and infuriatingly cheerful","gender":"male"},"topic":"Is humanity doomed or just getting started?"}
+${categoryGuide}
 
-Rules: names match gender, vivid dramatic contrast between characters, topic suits them specifically (max 12 words), personalities 4-7 specific words. Archetypes: hero vs villain, parent vs child, scientist vs mystic, optimist vs pessimist, rebel vs authority, logic vs emotion. Be surprising and creative each time.`
+Rules: names match gender and fit the category theme, vivid dramatic contrast between characters, topic suits them specifically (max 12 words), personalities 4-7 specific words. Be surprising and creative each time — never repeat previous setups.`
   console.log('generate-setup: start')
   try {
     console.log('generate-setup: fetching')
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -219,6 +261,39 @@ Rules: names match gender, vivid dramatic contrast between characters, topic sui
     res.json(JSON.parse(match[0]))
   } catch (err) {
     console.error('generate-setup error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/debate-summary', async (req, res) => {
+  const { transcript, nameA, nameB, topic } = req.body
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
+    const prompt = `You are a debate analyst. Analyze this debate between ${nameA} and ${nameB} on: "${topic}".
+
+Reply with ONLY valid JSON (no markdown):
+{
+  "keyArgumentsA": ["argument 1", "argument 2", "argument 3"],
+  "keyArgumentsB": ["argument 1", "argument 2", "argument 3"],
+  "analysis": "2-3 sentence analysis of debate dynamics, rhetorical strategies, and logical strengths/weaknesses.",
+  "winner": "A" or "B" or "draw",
+  "winnerReasoning": "One sentence explaining why."
+}
+
+Rules:
+- Extract 2-4 strongest arguments from each side
+- Be specific — reference actual points made
+- Winner determined by argument quality, not speaking time
+- If genuinely close, declare a draw
+
+Transcript:
+${transcript}`
+
+    const result = await model.generateContent(prompt)
+    const raw = result.response.text().trim().replace(/```json?|```/g, '').trim()
+    res.json(JSON.parse(raw))
+  } catch (err) {
+    console.error('debate-summary error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
