@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1e1b4b"/>
+  <!-- Left speech bubble (blue) -->
+  <rect x="56" y="120" width="220" height="140" rx="24" fill="#3b82f6"/>
+  <polygon points="80,260 56,310 130,260" fill="#3b82f6"/>
+  <!-- Right speech bubble (purple) -->
+  <rect x="236" y="252" width="220" height="140" rx="24" fill="#a855f7"/>
+  <polygon points="432,392 456,442 382,392" fill="#a855f7"/>
+  <!-- Dots in left bubble -->
+  <circle cx="136" cy="190" r="14" fill="#fff" opacity="0.9"/>
+  <circle cx="176" cy="190" r="14" fill="#fff" opacity="0.9"/>
+  <circle cx="216" cy="190" r="14" fill="#fff" opacity="0.9"/>
+  <!-- Dots in right bubble -->
+  <circle cx="296" cy="322" r="14" fill="#fff" opacity="0.9"/>
+  <circle cx="336" cy="322" r="14" fill="#fff" opacity="0.9"/>
+  <circle cx="376" cy="322" r="14" fill="#fff" opacity="0.9"/>
+</svg>

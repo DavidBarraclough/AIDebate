@@ -1,8 +1,39 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['icon.svg'],
+      manifest: {
+        name: 'AI Debate Studio',
+        short_name: 'Debate Studio',
+        description: 'Watch two AI personas debate live with spoken voices and generated images.',
+        theme_color: '#1e1b4b',
+        background_color: '#030712',
+        display: 'standalone',
+        orientation: 'portrait-primary',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          {
+            src: '/icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
+      },
+    }),
+  ],
 })
