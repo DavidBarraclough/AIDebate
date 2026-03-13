@@ -2,6 +2,34 @@
 
 This guide shows the exact setup to host your app so other people can access it.
 
+## Relevance Check (March 2026)
+
+This approach is still relevant for the current repository and codebase.
+
+Why it is currently correct:
+- Frontend is a Vite app and deploys cleanly to Vercel.
+- Backend is an Express service and maps directly to Render Web Service.
+- Current code uses VITE_API_BASE_URL, CORS_ORIGIN, ALLOW_SERVER_FALLBACK, GEMINI_API_KEY, and PORT exactly as described.
+
+Limitations to be aware of:
+- This guide is optimized for fast launch, not full production operations.
+- Supabase, Stripe, and advanced production controls need additional setup in Phase 2.
+
+## Phase Ownership
+
+Phase 1 must include:
+- Public deploy of frontend and backend
+- Correct CORS lock-down
+- End-to-end hosted smoke test
+
+Phase 2 should add:
+- Staging and production environment separation
+- Monitoring/alerting and incident visibility
+- Backup/recovery and runbooks
+- Cost guardrails and usage anomaly alerts
+
+If Supabase Auth/Database are introduced in Phase 1 or Phase 2, keep this hosting model and add Supabase project env variables to both frontend and backend deployment settings.
+
 ## What you are deploying
 
 - Frontend: Vite + React app, hosted on Vercel
