@@ -1,5 +1,6 @@
 import GeminiSelfChatAudio from './components/GeminiSelfChatAudio'
 import FeaturesHelpPage from './components/FeaturesHelpPage'
+import DebateHistory from './components/DebateHistory'
 import { useEffect, useState } from 'react'
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient'
 
@@ -227,6 +228,12 @@ export default function App() {
                 Studio
               </button>
               <button
+                onClick={() => setActiveView('history')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'history' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+              >
+                History
+              </button>
+              <button
                 onClick={() => setActiveView('help')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'help' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
               >
@@ -303,7 +310,9 @@ export default function App() {
         )}
       </header>
       <main className="flex-1 overflow-auto p-3 sm:p-4">
-        {activeView === 'studio' ? <GeminiSelfChatAudio userApiKey={userApiKey} /> : <FeaturesHelpPage />}
+        {activeView === 'studio' && <GeminiSelfChatAudio userApiKey={userApiKey} user={user} />}
+        {activeView === 'history' && <DebateHistory user={user} />}
+        {activeView === 'help' && <FeaturesHelpPage />}
       </main>
     </div>
   )

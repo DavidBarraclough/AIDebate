@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createDebate, saveMessage, updateDebateSummary } from '../lib/debateDb'
 
 const PERSONAS = {
   A: {
@@ -732,7 +733,7 @@ function applyAccentThemeToSetup(styleKey, setup) {
   }
 }
 
-export default function GeminiSelfChatAudio({ userApiKey = '' }) {
+export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
   const [topic, setTopic] = useState('')
   const [inputMode, setInputMode] = useState('voice') // 'type' | 'voice'
   const [messages, setMessages] = useState([])
@@ -798,6 +799,9 @@ export default function GeminiSelfChatAudio({ userApiKey = '' }) {
   const lastMessageRef = useRef('')
   const currentTurnRef = useRef('A')
   const elapsedBeforePauseRef = useRef(0)
+  // Persistence
+  const debateIdRef = useRef(null)
+  const turnIndexRef = useRef(0)
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60).toString().padStart(2, '0')
@@ -1086,6 +1090,12 @@ export default function GeminiSelfChatAudio({ userApiKey = '' }) {
       if (data.error) throw new Error(data.error)
       setSummary(data)
 
+      // Persist summary (fire-and-forget)
+      if (debateIdRef.current) {
+        updateDebateSummary(debateIdRef.current, data)
+          .catch(err => console.error('[db] updateDebateSummary failed:', err))
+      }
+
       // Read a concise, high-signal summary in the same moderator voice.
       if (!mutedRef.current && !stopRef.current) {
         const spokenSummary = buildSpokenSummary(data)
@@ -1135,6 +1145,23 @@ export default function GeminiSelfChatAudio({ userApiKey = '' }) {
       lastMessageRef.current = `Let's discuss: ${topic.trim()}`
       currentTurnRef.current = 'A'
       elapsedBeforePauseRef.current = 0
+      debateIdRef.current = null
+      turnIndexRef.current = 0
+
+      // Persist debate row (fire-and-forget — don't block the debate starting)
+      if (user?.id) {
+        createDebate({
+          userId:        user.id,
+          topic:         topic.trim(),
+          nameA:         namesRef.current.A,
+          nameB:         namesRef.current.B,
+          personalityA:  personalitiesRef.current.A,
+          personalityB:  personalitiesRef.current.B,
+          style:         styleRef.current,
+          category,
+        }).then(id => { debateIdRef.current = id })
+          .catch(err => console.error('[db] createDebate failed:', err))
+      }
     }
 
     setRunning(true)
@@ -1159,6 +1186,18 @@ export default function GeminiSelfChatAudio({ userApiKey = '' }) {
         const styleIntro = styleRef.current !== 'ai' ? ` Tonight's style: ${spokenStyleLabel}!` : ''
         const intro = `Welcome! Tonight's topic: ${cleanTopic}. In one corner, we have ${nameA}. And in the other corner, ${nameB}.${styleIntro} Let the debate begin!`
         setMessages(prev => [...prev, { persona: 'host', content: intro }])
+        // Persist host intro (fire-and-forget; debateIdRef may be populated async — retry once settled)
+        const persistHostIntro = () => {
+          if (!debateIdRef.current) return
+          saveMessage({ debateId: debateIdRef.current, speaker: 'host', text: intro, turnIndex: turnIndexRef.current++ })
+            .catch(err => console.error('[db] saveMessage (host) failed:', err))
+        }
+        // Give createDebate a moment to resolve if it hasn't yet
+        if (debateIdRef.current) {
+          persistHostIntro()
+        } else {
+          setTimeout(persistHostIntro, 2000)
+        }
         setInitialising(false)
         // Prefetch first speaker's reply + TTS while host intro plays
         prefetchReplyPromise = callTurn('A', historyARef.current, lastMessageRef.current)
@@ -1230,6 +1269,18 @@ export default function GeminiSelfChatAudio({ userApiKey = '' }) {
 
         // Image for this turn — use prefetched data or fetch fresh
         const imagePrompt = `Cinematic photorealistic illustration of "${topic}". Dramatic lighting, high quality digital art. Absolutely no text, words, letters, numbers, or writing visible anywhere in the image.`
+
+        // Persist message (fire-and-forget)
+        if (debateIdRef.current) {
+          const idx = turnIndexRef.current++
+          saveMessage({
+            debateId:    debateIdRef.current,
+            speaker:     turn,
+            text:        cleanText,
+            imagePrompt,
+            turnIndex:   idx,
+          }).catch(err => console.error('[db] saveMessage failed:', err))
+        }
         const applyImage = (data) => {
           if (data.error) {
             if (data.error.toLowerCase().includes('quota')) {
