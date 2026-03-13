@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { createDebate, saveMessage, updateDebateSummary } from '../lib/debateDb'
+import { saveMessage, updateDebateSummary } from '../lib/debateDb'
+import { supabase } from '../lib/supabaseClient'
 
 const PERSONAS = {
   A: {
@@ -1096,6 +1097,16 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
           .catch(err => console.error('[db] updateDebateSummary failed:', err))
       }
 
+      // Bookend end image
+      if (imagesEnabledRef.current) {
+        const endPrompt = `Cinematic photorealistic illustration of "${topic}" debate conclusion. Dramatic lighting, high quality digital art. Absolutely no text, words, letters, numbers, or writing visible anywhere in the image.`
+        postJson('image', { prompt: endPrompt }).then(imgData => {
+          if (imgData.imageData) {
+            setImages(prev => ({ ...prev, end: `data:${imgData.mimeType};base64,${imgData.imageData}` }))
+          }
+        }).catch(err => console.error('End image error:', err))
+      }
+
       // Read a concise, high-signal summary in the same moderator voice.
       if (!mutedRef.current && !stopRef.current) {
         const spokenSummary = buildSpokenSummary(data)
@@ -1148,19 +1159,42 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
       debateIdRef.current = null
       turnIndexRef.current = 0
 
-      // Persist debate row (fire-and-forget — don't block the debate starting)
-      if (user?.id) {
-        createDebate({
-          userId:        user.id,
-          topic:         topic.trim(),
-          nameA:         namesRef.current.A,
-          nameB:         namesRef.current.B,
-          personalityA:  personalitiesRef.current.A,
-          personalityB:  personalitiesRef.current.B,
-          style:         styleRef.current,
-          category,
-        }).then(id => { debateIdRef.current = id })
-          .catch(err => console.error('[db] createDebate failed:', err))
+      // Enforce daily usage limit + create debate row via backend
+      if (user?.id && supabase) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const token = session?.access_token
+          if (token) {
+            const trimmedKey = userApiKey.trim()
+            const startRes = await fetch(buildApiUrl('debate/start'), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                ...(trimmedKey ? { 'x-gemini-api-key': trimmedKey } : {}),
+              },
+              body: JSON.stringify({
+                topic:         topic.trim(),
+                nameA:         namesRef.current.A,
+                nameB:         namesRef.current.B,
+                personalityA:  personalitiesRef.current.A,
+                personalityB:  personalitiesRef.current.B,
+                style:         styleRef.current,
+                category,
+              }),
+            })
+            const startData = await startRes.json()
+            if (startRes.status === 429) {
+              setError(startData.error || 'Daily debate limit reached. Try again tomorrow.')
+              setInitialising(false)
+              return
+            }
+            if (startData.debateId) debateIdRef.current = startData.debateId
+          }
+        } catch (err) {
+          console.error('[db] debate/start failed:', err)
+          // Non-blocking — proceed without persistence if server unreachable
+        }
       }
     }
 
@@ -1174,7 +1208,6 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
     try {
       let prefetchReplyPromise = null
       let prefetchTTSPromise = null
-      let prefetchImagePromise = null
 
       // Host introduction on fresh start
       if (!isResume) {
@@ -1222,6 +1255,22 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
           setSpeaking(null)
         }
         if (stopRef.current) throw new Error('stopped')
+
+        // Bookend start image — fire-and-forget while debate begins
+        if (imagesEnabledRef.current) {
+          const startPrompt = `Cinematic photorealistic illustration of "${topic.trim()}". Dramatic lighting, high quality digital art. Absolutely no text, words, letters, numbers, or writing visible anywhere in the image.`
+          postJson('image', { prompt: startPrompt }).then(data => {
+            if (data.error) {
+              if (data.error.toLowerCase().includes('quota')) {
+                setImagesEnabled(false)
+                setQuotaAlerts(prev => ({ ...prev, image: true }))
+                trackQuotaHit('image')
+              }
+            } else if (data.imageData) {
+              setImages(prev => ({ ...prev, start: `data:${data.mimeType};base64,${data.imageData}` }))
+            }
+          }).catch(err => console.error('Start image error:', err))
+        }
       }
 
       setInitialising(false)
@@ -1281,36 +1330,13 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
             turnIndex:   idx,
           }).catch(err => console.error('[db] saveMessage failed:', err))
         }
-        const applyImage = (data) => {
-          if (data.error) {
-            if (data.error.toLowerCase().includes('quota')) {
-              setImagesEnabled(false)
-              setQuotaAlerts(prev => ({ ...prev, image: true }))
-              trackQuotaHit('image')
-            } else {
-              console.error('Image API error:', data.error)
-            }
-          } else if (data.imageData) {
-            setImages(prev => ({ ...prev, [msgIndex]: `data:${data.mimeType};base64,${data.imageData}` }))
-          }
-        }
-        const currentImagePromise = prefetchImagePromise
-          ? prefetchImagePromise.then(applyImage).catch(err => console.error('Image fetch error:', err))
-          : (imagesEnabledRef.current
-            ? postJson('image', { prompt: imagePrompt }).then(applyImage).catch(err => console.error('Image fetch error:', err))
-            : Promise.resolve())
-        prefetchImagePromise = null
-
-        // Prefetch NEXT turn's reply + TTS + image while current TTS plays
+        // Prefetch NEXT turn's reply + TTS while current TTS plays
         const nextReplyPromise = callTurn(nextTurn, nextTurn === 'A' ? historyARef.current : historyBRef.current, reply)
         // Chain TTS fetch after reply resolves so audio is ready instantly
         const nextTTSPromise = !mutedRef.current
           ? nextReplyPromise.then(nextReply =>
               fetchTTS(parseEmotion(nextReply).cleanText, nextTurn, voicesRef.current[nextTurn], postJson)
             ).catch(() => null)
-          : null
-        const nextImagePromise = imagesEnabledRef.current
-          ? postJson('image', { prompt: imagePrompt })
           : null
 
         // Play TTS — use prefetched audio data or fetch fresh
@@ -1348,7 +1374,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
                 : Math.max(1200, cleanText.split(/\s+/).length * 170),
             )
           : null
-        await Promise.all([ttsPromise, currentImagePromise, readingDelay].filter(Boolean))
+        await Promise.all([ttsPromise, readingDelay].filter(Boolean))
         setSpeaking(null)
 
         while (pauseDebateRef.current && !stopRef.current) {
@@ -1365,11 +1391,9 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
           // Discard prefetch — next message changed due to interrupt
           prefetchReplyPromise = null
           prefetchTTSPromise = null
-          prefetchImagePromise = null
         } else {
           prefetchReplyPromise = nextReplyPromise
           prefetchTTSPromise = nextTTSPromise
-          prefetchImagePromise = nextImagePromise
         }
       }
     } catch (err) {

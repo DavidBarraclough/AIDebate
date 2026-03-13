@@ -1,28 +1,6 @@
 import { supabase } from './supabaseClient'
 
 /**
- * Create a new debate row. Returns the new debate's UUID.
- */
-export async function createDebate({ userId, topic, nameA, nameB, personalityA, personalityB, style, category }) {
-  const { data, error } = await supabase
-    .from('debates')
-    .insert({
-      user_id:       userId,
-      topic,
-      name_a:        nameA,
-      name_b:        nameB,
-      personality_a: personalityA,
-      personality_b: personalityB,
-      style,
-      category,
-    })
-    .select('id')
-    .single()
-  if (error) throw error
-  return data.id
-}
-
-/**
  * Persist a single debate message/turn. Fire-and-forget safe — always returns a promise.
  */
 export async function saveMessage({ debateId, speaker, text, imagePrompt, turnIndex }) {

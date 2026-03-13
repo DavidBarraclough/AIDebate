@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { createClient } from '@supabase/supabase-js'
 import 'dotenv/config'
 
 const app = express()
@@ -24,6 +25,39 @@ app.use(cors({
 app.use(express.json())
 app.use((req, _res, next) => { console.log(req.method, req.path); next() })
 
+// ─── Supabase server client ──────────────────────────────────────────────────
+const supabaseUrl  = (process.env.SUPABASE_URL  || '').trim()
+const supabaseAnon = (process.env.SUPABASE_ANON_KEY || '').trim()
+const supabaseServer = supabaseUrl && supabaseAnon
+  ? createClient(supabaseUrl, supabaseAnon)
+  : null
+
+const DAILY_DEBATE_LIMIT = 10
+
+/**
+ * Verify a Supabase JWT from the Authorization header.
+ * Returns the user object or sends a 401 and returns null.
+ */
+async function requireSupabaseUser(req, res) {
+  if (!supabaseServer) {
+    res.status(503).json({ error: 'Supabase not configured on server.' })
+    return null
+  }
+  const auth = (req.headers.authorization || '').trim()
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+  if (!token) {
+    res.status(401).json({ error: 'Missing auth token.' })
+    return null
+  }
+  const { data: { user }, error } = await supabaseServer.auth.getUser(token)
+  if (error || !user) {
+    res.status(401).json({ error: 'Invalid or expired session.' })
+    return null
+  }
+  return user
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 const HEADER_API_KEY = 'x-gemini-api-key'
 
 function resolveGeminiApiKey(req) {
@@ -43,6 +77,67 @@ function requireGeminiApiKey(req, res) {
   }
   return apiKey
 }
+
+// Start a debate: enforce daily limit, create debate row, return debateId
+app.post('/api/debate/start', async (req, res) => {
+  const user = await requireSupabaseUser(req, res)
+  if (!user) return
+
+  const { topic, nameA, nameB, personalityA, personalityB, style, category } = req.body
+
+  // User-scoped client (respects RLS — user can only see/write their own rows)
+  const auth = req.headers.authorization
+  const userClient = createClient(supabaseUrl, supabaseAnon, {
+    global: { headers: { Authorization: auth } },
+  })
+
+  try {
+    // Count debates created today
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const { count, error: countError } = await userClient
+      .from('debates')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', todayStart.toISOString())
+
+    if (countError) throw countError
+
+    if (count >= DAILY_DEBATE_LIMIT) {
+      return res.status(429).json({
+        error: `Daily limit reached (${DAILY_DEBATE_LIMIT} debates/day). Try again tomorrow.`,
+        used: count,
+        limit: DAILY_DEBATE_LIMIT,
+      })
+    }
+
+    // Create the debate row
+    const { data, error: insertError } = await userClient
+      .from('debates')
+      .insert({
+        user_id:       user.id,
+        topic,
+        name_a:        nameA,
+        name_b:        nameB,
+        personality_a: personalityA,
+        personality_b: personalityB,
+        style,
+        category,
+      })
+      .select('id')
+      .single()
+
+    if (insertError) throw insertError
+
+    return res.json({
+      debateId: data.id,
+      used: count + 1,
+      limit: DAILY_DEBATE_LIMIT,
+    })
+  } catch (err) {
+    console.error('debate/start error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
 
 app.post('/api/test-key', async (req, res) => {
   const apiKey = requireGeminiApiKey(req, res)

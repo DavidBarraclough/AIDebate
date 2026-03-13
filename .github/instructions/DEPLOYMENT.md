@@ -69,6 +69,8 @@ If Supabase Auth/Database are introduced in Phase 1 or Phase 2, keep this hostin
    - CORS_ORIGIN=https://YOUR-FRONTEND-URL.vercel.app
    - ALLOW_SERVER_FALLBACK=false
    - GEMINI_API_KEY=OPTIONAL (only if you want server fallback)
+   - SUPABASE_URL=https://YOUR-PROJECT.supabase.co (same as VITE_SUPABASE_URL)
+   - SUPABASE_ANON_KEY=YOUR-ANON-KEY (same as VITE_SUPABASE_ANON_KEY, required for usage limits)
 5. Deploy.
 6. Copy your backend URL, for example:
    - https://your-api.onrender.com
@@ -175,6 +177,8 @@ Local behavior:
 - CORS_ORIGIN=https://your-app.vercel.app
 - ALLOW_SERVER_FALLBACK=false
 - GEMINI_API_KEY=
+- SUPABASE_URL=
+- SUPABASE_ANON_KEY=
 
 ### Vercel (frontend)
 
