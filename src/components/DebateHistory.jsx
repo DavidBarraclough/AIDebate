@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getUserDebates } from '../lib/debateDb'
 
 const STYLE_LABELS = {
@@ -13,6 +14,27 @@ function formatDate(iso) {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
+}
+
+function CopyLinkButton({ debateId }) {
+  const [copied, setCopied] = useState(false)
+  const url = `${window.location.origin}/debate/${debateId}`
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="px-2.5 py-1 rounded-lg border border-gray-700 bg-gray-800 text-xs text-gray-300 hover:bg-gray-700 transition-colors cursor-pointer"
+    >
+      {copied ? 'Copied!' : 'Copy Link'}
+    </button>
+  )
 }
 
 export default function DebateHistory({ user }) {
@@ -79,9 +101,14 @@ export default function DebateHistory({ user }) {
             {d.summary?.winnerReasoning && (
               <p className="mt-2 text-xs text-gray-400 line-clamp-2">{d.summary.winnerReasoning}</p>
             )}
-            {/* Share link placeholder — wired up in Day 3 */}
             <div className="mt-3 flex gap-2">
-              <span className="text-xs text-gray-600 italic">Share link available in Day 3</span>
+              <Link
+                to={`/debate/${d.id}`}
+                className="px-2.5 py-1 rounded-lg border border-indigo-700/60 bg-indigo-950/40 text-xs text-indigo-300 hover:bg-indigo-900/40 transition-colors"
+              >
+                View
+              </Link>
+              <CopyLinkButton debateId={d.id} />
             </div>
           </li>
         ))}
