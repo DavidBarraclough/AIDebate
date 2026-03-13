@@ -734,7 +734,9 @@ function applyAccentThemeToSetup(styleKey, setup) {
   }
 }
 
-export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
+const FREE_TURN_LIMIT = 4 // 2 turns per debater
+
+export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPro = false, onUpgrade = null }) {
   const [topic, setTopic] = useState('')
   const [inputMode, setInputMode] = useState('voice') // 'type' | 'voice'
   const [messages, setMessages] = useState([])
@@ -803,6 +805,9 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
   // Persistence
   const debateIdRef = useRef(null)
   const turnIndexRef = useRef(0)
+  // Pro status ref so it's readable inside async debate loop
+  const isProRef = useRef(isPro)
+  useEffect(() => { isProRef.current = isPro }, [isPro])
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60).toString().padStart(2, '0')
@@ -1097,8 +1102,8 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
           .catch(err => console.error('[db] updateDebateSummary failed:', err))
       }
 
-      // Bookend end image
-      if (imagesEnabledRef.current) {
+      // Bookend end image — Pro only
+      if (imagesEnabledRef.current && isProRef.current) {
         const endPrompt = `Cinematic photorealistic illustration of "${topic}" debate conclusion. Dramatic lighting, high quality digital art. Absolutely no text, words, letters, numbers, or writing visible anywhere in the image.`
         postJson('image', { prompt: endPrompt }).then(imgData => {
           if (imgData.imageData) {
@@ -1274,8 +1279,11 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
       }
 
       setInitialising(false)
+      let turnCount = 0
       while (true) {
         if (stopRef.current) break
+        // Free tier: cap at FREE_TURN_LIMIT turns
+        if (!isProRef.current && turnCount >= FREE_TURN_LIMIT) break
         const totalElapsed = elapsedBeforePauseRef.current + (Date.now() - startTimeRef.current)
         if (totalElapsed >= MAX_DURATION_MS) break
 
@@ -1395,6 +1403,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
           prefetchReplyPromise = nextReplyPromise
           prefetchTTSPromise = nextTTSPromise
         }
+        turnCount++
       }
     } catch (err) {
       setError(err.message)
@@ -1586,28 +1595,38 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null }) {
             </button>
             {!running && !paused ? (
               <>
-                <select
-                  value={category}
-                  onChange={e => setCategory(e.target.value)}
-                  disabled={randomising}
-                  style={{ colorScheme: 'dark' }}
-                  className="bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 shrink-0"
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-                <select
-                  value={style}
-                  onChange={e => setStyle(e.target.value)}
-                  disabled={randomising}
-                  style={{ colorScheme: 'dark' }}
-                  className="bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 shrink-0"
-                >
-                  {STYLES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
+                <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro to change category' : undefined}>
+                  <select
+                    value={category}
+                    onChange={e => { if (isPro) setCategory(e.target.value) }}
+                    disabled={randomising}
+                    style={{ colorScheme: 'dark' }}
+                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
+                  >
+                    {CATEGORIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                  {!isPro && (
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>
+                  )}
+                </div>
+                <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro to change style' : undefined}>
+                  <select
+                    value={style}
+                    onChange={e => { if (isPro) setStyle(e.target.value) }}
+                    disabled={randomising}
+                    style={{ colorScheme: 'dark' }}
+                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
+                  >
+                    {STYLES.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                  {!isPro && (
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>
+                  )}
+                </div>
                 <button
                   onClick={randomise}
                   disabled={randomising}

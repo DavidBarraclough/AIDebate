@@ -1,8 +1,10 @@
 import GeminiSelfChatAudio from './components/GeminiSelfChatAudio'
 import FeaturesHelpPage from './components/FeaturesHelpPage'
 import DebateHistory from './components/DebateHistory'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient'
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim() || (import.meta.env.DEV ? 'http://localhost:3001' : '')
 
 const GEMINI_KEY_STORAGE_KEY = 'gemini-user-api-key'
 
@@ -28,6 +30,9 @@ export default function App() {
   const [authInfo, setAuthInfo] = useState('')
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured)
   const [user, setUser] = useState(null)
+  const [isPro, setIsPro] = useState(false)
+  const [proLoading, setProLoading] = useState(false)
+  const [upgrading, setUpgrading] = useState(false)
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return
@@ -55,6 +60,91 @@ export default function App() {
       data?.subscription?.unsubscribe()
     }
   }, [])
+
+  const fetchProStatus = useCallback(async (currentUser) => {
+    if (!currentUser || !supabase) return
+    setProLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      const res = await fetch(`${API_BASE}/api/subscription/status`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setIsPro(data.isPro || false)
+      }
+    } catch (err) {
+      console.error('Failed to fetch pro status:', err)
+    } finally {
+      setProLoading(false)
+    }
+  }, [])
+
+  // Check pro status when user signs in
+  useEffect(() => {
+    if (user) fetchProStatus(user)
+    else setIsPro(false)
+  }, [user, fetchProStatus])
+
+  // Handle return from Stripe Checkout (confirm payment + write subscription to Supabase)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const sessionId = params.get('session_id')
+    if (!sessionId || !user || !supabase) return
+
+    // Clean URL immediately
+    window.history.replaceState({}, '', window.location.pathname)
+
+    const confirmPayment = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch(`${API_BASE}/api/stripe/confirm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ sessionId }),
+        })
+        if (!res.ok) return
+        const sub = await res.json()
+        // Write subscription to Supabase using the user's own JWT (RLS allows this)
+        await supabase.from('subscriptions').upsert({
+          user_id:                user.id,
+          stripe_customer_id:     sub.stripeCustomerId,
+          stripe_subscription_id: sub.stripeSubscriptionId,
+          status:                 sub.status,
+          current_period_end:     sub.currentPeriodEnd,
+          updated_at:             new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+        setIsPro(sub.status === 'active')
+      } catch (err) {
+        console.error('Failed to confirm payment:', err)
+      }
+    }
+
+    confirmPayment()
+  }, [user])
+
+  const handleUpgrade = async () => {
+    if (!supabase || upgrading) return
+    setUpgrading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+      const origin = window.location.origin
+      const res = await fetch(`${API_BASE}/api/stripe/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ successUrl: origin, cancelUrl: origin }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch (err) {
+      console.error('Failed to start checkout:', err)
+    } finally {
+      setUpgrading(false)
+    }
+  }
 
   const saveUserApiKey = () => {
     const trimmed = apiKeyInput.trim()
@@ -248,6 +338,20 @@ export default function App() {
                 {showApiKeyPanel ? 'Hide API Key' : 'Open API Key Setup'}
               </button>
             )}
+            {!proLoading && !isPro && (
+              <button
+                onClick={handleUpgrade}
+                disabled={upgrading}
+                className="px-3 py-1.5 rounded-lg border border-amber-600/60 bg-amber-950/40 text-xs font-medium text-amber-300 hover:bg-amber-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                {upgrading ? 'Opening...' : 'Upgrade to Pro · £8/mo'}
+              </button>
+            )}
+            {isPro && (
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-900/60 text-indigo-300 border border-indigo-700/40">
+                Pro
+              </span>
+            )}
             <button
               onClick={handleSignOut}
               disabled={authBusy}
@@ -310,7 +414,7 @@ export default function App() {
         )}
       </header>
       <main className="flex-1 overflow-auto p-3 sm:p-4">
-        {activeView === 'studio' && <GeminiSelfChatAudio userApiKey={userApiKey} user={user} />}
+        {activeView === 'studio' && <GeminiSelfChatAudio userApiKey={userApiKey} user={user} isPro={isPro} onUpgrade={handleUpgrade} />}
         {activeView === 'history' && <DebateHistory user={user} />}
         {activeView === 'help' && <FeaturesHelpPage />}
       </main>

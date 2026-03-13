@@ -71,6 +71,8 @@ If Supabase Auth/Database are introduced in Phase 1 or Phase 2, keep this hostin
    - GEMINI_API_KEY=OPTIONAL (only if you want server fallback)
    - SUPABASE_URL=https://YOUR-PROJECT.supabase.co (same as VITE_SUPABASE_URL)
    - SUPABASE_ANON_KEY=YOUR-ANON-KEY (same as VITE_SUPABASE_ANON_KEY, required for usage limits)
+   - STRIPE_SECRET_KEY=sk_live_... (from Stripe dashboard → Developers → API keys)
+   - STRIPE_PRICE_ID=price_... (from Stripe dashboard → Products → your Pro plan price ID)
 5. Deploy.
 6. Copy your backend URL, for example:
    - https://your-api.onrender.com
@@ -179,6 +181,8 @@ Local behavior:
 - GEMINI_API_KEY=
 - SUPABASE_URL=
 - SUPABASE_ANON_KEY=
+- STRIPE_SECRET_KEY=
+- STRIPE_PRICE_ID=
 
 ### Vercel (frontend)
 

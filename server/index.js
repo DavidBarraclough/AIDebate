@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@supabase/supabase-js'
+import Stripe from 'stripe'
 import 'dotenv/config'
 
 const app = express()
@@ -24,6 +25,11 @@ app.use(cors({
 }))
 app.use(express.json())
 app.use((req, _res, next) => { console.log(req.method, req.path); next() })
+
+// ─── Stripe ──────────────────────────────────────────────────────────────────
+const stripeSecretKey = (process.env.STRIPE_SECRET_KEY || '').trim()
+const stripePriceId   = (process.env.STRIPE_PRICE_ID   || '').trim()
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: '2025-05-28.basil' }) : null
 
 // ─── Supabase server client ──────────────────────────────────────────────────
 const supabaseUrl  = (process.env.SUPABASE_URL  || '').trim()
@@ -539,6 +545,98 @@ ${transcript}`
   }
 })
 
+// ─── Stripe endpoints ─────────────────────────────────────────────────────────
+
+// Create a Stripe Checkout session → return { url }
+app.post('/api/stripe/checkout', async (req, res) => {
+  if (!stripe || !stripePriceId) return res.status(503).json({ error: 'Payments not configured.' })
+  const user = await requireSupabaseUser(req, res)
+  if (!user) return
+
+  const { successUrl, cancelUrl } = req.body
+  if (!successUrl || !cancelUrl) return res.status(400).json({ error: 'successUrl and cancelUrl required.' })
+
+  try {
+    // Reuse existing customer if one was created before
+    const existing = await stripe.customers.list({ email: user.email, limit: 1 })
+    const customer = existing.data[0]
+      ? existing.data[0]
+      : await stripe.customers.create({ email: user.email, metadata: { userId: user.id } })
+
+    const session = await stripe.checkout.sessions.create({
+      customer:   customer.id,
+      mode:       'subscription',
+      line_items: [{ price: stripePriceId, quantity: 1 }],
+      metadata:   { userId: user.id },
+      success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:  cancelUrl,
+    })
+
+    return res.json({ url: session.url })
+  } catch (err) {
+    console.error('stripe/checkout error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// Confirm a completed Checkout session → frontend writes subscription to Supabase
+app.post('/api/stripe/confirm', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured.' })
+  const user = await requireSupabaseUser(req, res)
+  if (!user) return
+
+  const { sessionId } = req.body
+  if (!sessionId) return res.status(400).json({ error: 'sessionId required.' })
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['subscription'],
+    })
+    if (session.payment_status !== 'paid') {
+      return res.status(402).json({ error: 'Payment not completed.' })
+    }
+    const sub = session.subscription
+    return res.json({
+      stripeCustomerId:     session.customer,
+      stripeSubscriptionId: sub.id,
+      status:               sub.status,
+      currentPeriodEnd:     new Date(sub.current_period_end * 1000).toISOString(),
+    })
+  } catch (err) {
+    console.error('stripe/confirm error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// Check subscription status for the current user
+app.get('/api/subscription/status', async (req, res) => {
+  const user = await requireSupabaseUser(req, res)
+  if (!user) return
+
+  const auth = req.headers.authorization
+  const userClient = createClient(supabaseUrl, supabaseAnon, {
+    global: { headers: { Authorization: auth } },
+  })
+
+  try {
+    const { data: sub } = await userClient
+      .from('subscriptions')
+      .select('status, current_period_end')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const isPro = sub?.status === 'active' && sub?.current_period_end
+      ? new Date(sub.current_period_end) > new Date()
+      : false
+
+    return res.json({ isPro, status: sub?.status || 'inactive' })
+  } catch (err) {
+    console.error('subscription/status error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT) || 3001
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
