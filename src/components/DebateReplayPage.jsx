@@ -121,13 +121,11 @@ export default function DebateReplayPage() {
   })
 
   const sleep = (ms) => new Promise((resolve) => {
+    const start = Date.now()
     const id = setInterval(() => {
-      if (stopRef.current || !pauseRef.current) {
-        clearInterval(id)
-        resolve()
-      }
+      if (stopRef.current) { clearInterval(id); resolve(); return }
+      if (!pauseRef.current && Date.now() - start >= ms) { clearInterval(id); resolve() }
     }, 100)
-    setTimeout(() => { clearInterval(id); resolve() }, ms)
   })
 
   const waitWhilePaused = () => new Promise((resolve) => {

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { flushSync } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { saveMessage, updateDebateSummary } from '../lib/debateDb'
 import { supabase } from '../lib/supabaseClient'
 
@@ -804,6 +805,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   const [emotions, setEmotions] = useState({ A: 'CONFIDENT', B: 'CONFIDENT' })
   const [summary, setSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const navigate = useNavigate()
   const [verdictShared, setVerdictShared] = useState(false)
   const [libraryTag, setLibraryTag] = useState({ status: 'idle', isFeatured: false, category: 'tech' }) // idle | saving | saved | error
   const [showStats, setShowStats] = useState(false)
@@ -2006,9 +2008,16 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                             </svg>
                             {verdictShared ? 'Link copied!' : 'Share debate'}
                           </button>
-                          <span className="text-[10px] text-gray-600 font-mono truncate">
-                            /debate/{debateIdRef.current.slice(0, 8)}…
-                          </span>
+                          <button
+                            onClick={() => navigate(`/replay/${debateIdRef.current}`)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                              bg-gray-700/80 hover:bg-gray-600 text-white transition-colors cursor-pointer"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path d="M5 3l14 9-14 9V3z" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            Watch replay
+                          </button>
                         </div>
                       )}
 
