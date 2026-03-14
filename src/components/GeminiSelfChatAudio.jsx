@@ -2100,7 +2100,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
             <div className="flex flex-wrap gap-2 shrink-0">
               {imageKeys.map(idx => {
                 const persona = messages[idx]?.persona
-                const ring = persona ? PERSONAS[persona].ring : 'ring-gray-500'
+                const ring = (persona && PERSONAS[persona]) ? PERSONAS[persona].ring : 'ring-gray-500'
                 return (
                   <button
                     key={idx}
