@@ -1455,8 +1455,6 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
     if (startTimeRef.current) {
       elapsedBeforePauseRef.current += Date.now() - startTimeRef.current
     }
-    // Auto-generate summary whenever debate is paused
-    fetchSummary()
   }
 
   const resumeDebate = () => {
