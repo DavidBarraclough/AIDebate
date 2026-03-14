@@ -1670,7 +1670,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
             {/* ── LIVE ── */}
             {running && !paused && (
-              <div className="flex items-center gap-2">
+              <div className="hidden lg:flex items-center gap-2">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-950/50 border border-red-800/40 shrink-0">
                   <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />
                   <span className="text-red-400 text-[10px] font-semibold tracking-widest uppercase font-mono">Live</span>
@@ -2097,7 +2097,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
           {/* Thumbnail strip */}
           {imageKeys.length > 1 && (
-            <div className="flex flex-wrap gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 overflow-x-auto pb-1">
               {imageKeys.map(idx => {
                 const persona = messages[idx]?.persona
                 const ring = (persona && PERSONAS[persona]) ? PERSONAS[persona].ring : 'ring-gray-500'
@@ -2105,7 +2105,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                   <button
                     key={idx}
                     onClick={() => setViewIndex(idx)}
-                    className={`rounded-lg overflow-hidden ring-2 transition-all cursor-pointer
+                    className={`rounded-lg overflow-hidden ring-2 transition-all cursor-pointer shrink-0
                       ${displayIndex === idx ? ring : 'ring-transparent opacity-60 hover:opacity-100'}`}
                   >
                     <img src={images[idx]} alt="" className="w-24 h-14 object-cover block" />
