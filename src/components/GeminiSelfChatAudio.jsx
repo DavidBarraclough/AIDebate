@@ -1086,7 +1086,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   }
 
   const fetchSummary = async () => {
-    if (messages.length < 4) return
+    if (messages.length < 2) return
     setSummaryLoading(true)
     try {
       const transcript = messages
@@ -1450,6 +1450,8 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
     if (startTimeRef.current) {
       elapsedBeforePauseRef.current += Date.now() - startTimeRef.current
     }
+    // Auto-generate summary whenever debate is paused
+    fetchSummary()
   }
 
   const resumeDebate = () => {
@@ -1691,7 +1693,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
             {paused && !summaryLoading && (
               <button
                 onClick={fetchSummary}
-                disabled={messages.length < 4 || !!summary}
+                disabled={messages.length < 2 || !!summary}
                 className="px-5 py-3 bg-amber-700 hover:bg-amber-600 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
               >
                 Generate Summary
