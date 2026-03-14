@@ -65,6 +65,34 @@ const HOST_VOICE = 'Enceladus'
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim() || (import.meta.env.DEV ? 'http://localhost:3001' : '')
 const buildApiUrl = (endpoint) => API_BASE_URL ? `${API_BASE_URL}/api/${endpoint}` : `/api/${endpoint}`
 
+/**
+ * Upload an audio or image asset for a debate turn to Supabase Storage via the backend.
+ * Fire-and-forget safe — errors are logged but never thrown.
+ * @param {string} debateId
+ * @param {number} turnIndex  — the DB turn_index (from turnIndexRef, not msgCountRef)
+ * @param {'audio'|'image'} assetType
+ * @param {string} base64data — raw base64 string (no data: URI prefix)
+ * @param {string} mimeType
+ */
+async function uploadDebateAsset(debateId, turnIndex, assetType, base64data, mimeType) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) return
+    const res = await fetch(buildApiUrl('debate/upload-asset'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ debateId, turnIndex, assetType, data: base64data, mimeType }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.warn(`[storage] ${assetType} upload failed (${res.status}):`, err.error || res.statusText)
+    }
+  } catch (err) {
+    console.warn(`[storage] ${assetType} upload error:`, err.message)
+  }
+}
+
 const TELEMETRY_ENDPOINTS = [
   'self-chat-turn',
   'tts',
@@ -1326,6 +1354,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         setEmotions(prev => ({ ...prev, [turn]: emotion }))
 
         const capturedIdx = msgCountRef.current++
+        const capturedTurnIndex = turnIndexRef.current  // DB turn_index for this turn (before increment)
         setMessages(prev => [...prev, { persona: turn, content: cleanText }])
         setLastMessages(prev => ({ ...prev, [turn]: cleanText }))
 
@@ -1346,6 +1375,9 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
               }
             } else if (data.imageData) {
               setImages(prev => ({ ...prev, [capturedIdx]: `data:${data.mimeType};base64,${data.imageData}` }))
+              if (debateIdRef.current) {
+                uploadDebateAsset(debateIdRef.current, capturedTurnIndex, 'image', data.imageData, data.mimeType)
+              }
             }
           }).catch(err => console.error('Turn image error:', err))
         }
@@ -1379,6 +1411,9 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         let ttsPromise
         if (ttsData) {
           // Prefetched — audio ready, play immediately
+          if (debateIdRef.current && ttsData.audioContent) {
+            uploadDebateAsset(debateIdRef.current, capturedTurnIndex, 'audio', ttsData.audioContent, 'audio/wav')
+          }
           setSpeaking(turn)
           ttsPromise = playTTS(ttsData, currentAudioRef, onQuotaHit)
         } else if (!mutedRef.current) {
@@ -1387,6 +1422,9 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
           const freshTTSData = await fetchTTS(cleanText, turn, voicesRef.current[turn], postJson)
           setLoadingVoice(null)
           if (stopRef.current) break
+          if (debateIdRef.current && freshTTSData?.audioContent) {
+            uploadDebateAsset(debateIdRef.current, capturedTurnIndex, 'audio', freshTTSData.audioContent, 'audio/wav')
+          }
           setSpeaking(turn)
           ttsPromise = playTTS(freshTTSData, currentAudioRef, onQuotaHit)
         } else {

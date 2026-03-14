@@ -124,6 +124,23 @@ To test locally use the Stripe CLI:
 stripe listen --forward-to localhost:3001/api/stripe/webhook
 ```
 
+## 3c) Set up Supabase Storage buckets
+
+Required for audio and image persistence (debate replay system).
+
+1. Go to Supabase dashboard → Storage → New bucket.
+2. Create bucket named `debate-audio`:
+   - Public: yes (allows public read of stored audio files)
+3. Create bucket named `debate-images`:
+   - Public: yes (allows public read of stored images)
+4. For each bucket, set the following RLS policy (under Storage → Policies):
+   - Allow INSERT for authenticated users: `(auth.role() = 'authenticated')`
+   - Allow SELECT for all (public): `true`
+
+The backend uses the service role key (`SUPABASE_SERVICE_ROLE_KEY`) to upload assets, bypassing RLS. The public read policy allows replay players to stream audio and show images directly from the storage URL.
+
+If storage is not set up, debates will still work — audio and images will just not be persisted for replay. A 503 error will appear in server logs for each upload attempt.
+
 ## 4) Verify everything works
 
 1. Open your Vercel frontend URL.

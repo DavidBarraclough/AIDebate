@@ -429,6 +429,55 @@ app.post('/api/image', async (req, res) => {
   }
 })
 
+// Upload an audio or image asset for a debate message turn, store in Supabase Storage,
+// and update the messages row with the public URL.
+app.post('/api/debate/upload-asset', async (req, res) => {
+  const user = await requireSupabaseUser(req, res)
+  if (!user) return
+
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Storage not configured — SUPABASE_SERVICE_ROLE_KEY missing.' })
+  }
+
+  const { debateId, turnIndex, assetType, data, mimeType } = req.body
+  if (!debateId || turnIndex === undefined || !assetType || !data || !mimeType) {
+    return res.status(400).json({ error: 'Missing required fields: debateId, turnIndex, assetType, data, mimeType.' })
+  }
+  if (assetType !== 'audio' && assetType !== 'image') {
+    return res.status(400).json({ error: 'assetType must be "audio" or "image".' })
+  }
+
+  try {
+    const ext = assetType === 'audio' ? 'wav' : (mimeType.includes('png') ? 'png' : 'jpg')
+    const bucket = assetType === 'audio' ? 'debate-audio' : 'debate-images'
+    const storagePath = `${debateId}/${turnIndex}.${ext}`
+    const bytes = Buffer.from(data, 'base64')
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(bucket)
+      .upload(storagePath, bytes, { contentType: mimeType, upsert: true })
+
+    if (uploadError) throw uploadError
+
+    const { data: { publicUrl } } = supabaseAdmin.storage.from(bucket).getPublicUrl(storagePath)
+
+    // Update the message row — match by debate_id + turn_index
+    const updateField = assetType === 'audio' ? 'audio_url' : 'image_url'
+    const { error: updateError } = await supabaseAdmin
+      .from('messages')
+      .update({ [updateField]: publicUrl })
+      .eq('debate_id', debateId)
+      .eq('turn_index', turnIndex)
+
+    if (updateError) throw updateError
+
+    return res.json({ url: publicUrl })
+  } catch (err) {
+    console.error(`upload-asset (${assetType}) error:`, err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 // Classify a user interrupt — is it a personality update or just a topic redirect?
 app.post('/api/classify-interrupt', async (req, res) => {
   const { text } = req.body
