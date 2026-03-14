@@ -1545,7 +1545,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
           to   { transform: scaleY(1);   opacity: 0.7; }
         }
         .uniform-text-scale :where(span, p, button, input, select, option, li, label) {
-          font-size: 1rem !important;
+          font-size: clamp(13px, 1.6vw, 16px) !important;
           line-height: 1.35;
         }
         .uniform-text-scale button {
@@ -1558,7 +1558,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
           line-height: 1.2;
         }
         .uniform-text-scale .challenge-micro {
-          font-size: 0.68rem !important;
+          font-size: clamp(10px, 1.1vw, 12px) !important;
           line-height: 1.1;
           white-space: nowrap;
           letter-spacing: 0.02em;

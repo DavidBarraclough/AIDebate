@@ -298,9 +298,9 @@ export default function App() {
       <header className="shrink-0 border-b border-gray-800 px-4 sm:px-6 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h1 className="text-xl font-bold text-white">AI Debate Studio</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Structured voice debates with live visual context.</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Signed in as {user.email || user.id}</p>
+            <h1 className="font-bold text-white" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>AI Debate Studio</h1>
+            <p className="text-gray-400 mt-0.5" style={{ fontSize: 'clamp(11px, 1.2vw, 13px)' }}>Structured voice debates with live visual context.</p>
+            <p className="text-gray-500 mt-0.5" style={{ fontSize: 'clamp(10px, 1vw, 12px)' }}>Signed in as {user.email || user.id}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-lg border border-gray-700 bg-gray-900 p-1">
