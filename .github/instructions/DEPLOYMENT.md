@@ -73,6 +73,9 @@ If Supabase Auth/Database are introduced in Phase 1 or Phase 2, keep this hostin
    - SUPABASE_ANON_KEY=YOUR-ANON-KEY (same as VITE_SUPABASE_ANON_KEY, required for usage limits)
    - STRIPE_SECRET_KEY=sk_live_... (from Stripe dashboard → Developers → API keys)
    - STRIPE_PRICE_ID=price_... (from Stripe dashboard → Products → your Pro plan price ID)
+   - STRIPE_WEBHOOK_SECRET=whsec_... (from Stripe dashboard → Developers → Webhooks → your endpoint → Signing secret)
+   - SUPABASE_SERVICE_ROLE_KEY=... (from Supabase dashboard → Project Settings → API → service_role key — keep secret, server-only)
+   - DAILY_DEBATE_LIMIT=10 (optional — defaults to 10 if omitted. Increase temporarily for testing, e.g. set to 999, then revert to 10 for production)
 5. Deploy.
 6. Copy your backend URL, for example:
    - https://your-api.onrender.com
@@ -102,6 +105,24 @@ Notes:
 3. Redeploy the backend.
 
 If you later add a custom domain, update CORS_ORIGIN to that custom domain and redeploy.
+
+## 3b) Configure Stripe webhook
+
+This step is required for Pro subscriptions to activate reliably.
+
+1. Go to Stripe dashboard → Developers → Webhooks → Add endpoint.
+2. Set endpoint URL to: `https://your-api.onrender.com/api/stripe/webhook`
+3. Select events to listen for:
+   - `checkout.session.completed`
+   - `customer.subscription.updated`
+4. Copy the Signing secret (starts with `whsec_`).
+5. Add it to Render env as `STRIPE_WEBHOOK_SECRET`.
+6. Redeploy the backend.
+
+To test locally use the Stripe CLI:
+```
+stripe listen --forward-to localhost:3001/api/stripe/webhook
+```
 
 ## 4) Verify everything works
 
@@ -183,6 +204,9 @@ Local behavior:
 - SUPABASE_ANON_KEY=
 - STRIPE_SECRET_KEY=
 - STRIPE_PRICE_ID=
+- STRIPE_WEBHOOK_SECRET=
+- SUPABASE_SERVICE_ROLE_KEY=
+- DAILY_DEBATE_LIMIT=10  # defaults to 10 if omitted — set higher temporarily for testing, always revert before leaving in production
 
 ### Vercel (frontend)
 
