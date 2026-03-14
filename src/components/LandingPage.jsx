@@ -14,23 +14,23 @@ const CATEGORY_COLORS = {
 const EXAMPLE_DEBATE = [
   {
     speaker: 'Einstein',
-    side: 'for',
+    side: 'A',
     text: "The cosmos is vast beyond imagination. To confine humanity to a single fragile rock is not wisdom — it is timidity. Mars represents our next laboratory, our next frontier. The human spirit demands we reach for it.",
   },
   {
-    speaker: 'Elon Musk',
-    side: 'for',
-    text: "Exactly. And the technology is already within reach. Reusable rockets, in-situ resource utilisation, pressurised habitats. We're not talking about a dream — we're talking about an engineering problem with a known solution path.",
+    speaker: 'Tesla',
+    side: 'B',
+    text: "But at what cost? Every dollar launched toward Mars is a dollar not spent solving the crises already consuming this planet. We have not yet mastered Earth. Why flee it?",
   },
   {
     speaker: 'Einstein',
-    side: 'for',
-    text: "Though I would caution that the greatest obstacle is not the rocket equation but the human one. Cooperation between nations, sustained will across generations — these are the harder variables.",
+    side: 'A',
+    text: "The greatest obstacle is not the rocket equation but the human one. Cooperation between nations, sustained will across generations — these are the harder variables. Mars forces us to solve them.",
   },
   {
-    speaker: 'Elon Musk',
-    side: 'for',
-    text: "Which is why private enterprise must lead. Governments optimise for election cycles. A mission to Mars requires decades. Remove the political variable and you remove the primary bottleneck.",
+    speaker: 'Tesla',
+    side: 'B',
+    text: "Then let us solve them here first. Clean energy, clean water, a stable climate — these are engineering problems with known solution paths. The Earth is not yet lost. Mars can wait.",
   },
 ]
 
@@ -251,7 +251,7 @@ export default function LandingPage({
       <section className="max-w-4xl mx-auto px-6 py-16">
         <div className="text-center mb-10">
           <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400 mb-2">Example debate</p>
-          <h2 className="text-3xl font-bold text-white">Einstein vs Elon Musk</h2>
+          <h2 className="text-3xl font-bold text-white">Einstein vs Tesla</h2>
           <p className="mt-2 text-gray-400">Topic: Should humans colonise Mars?</p>
         </div>
 
@@ -259,7 +259,7 @@ export default function LandingPage({
           {EXAMPLE_DEBATE.map((turn, i) => (
             <div
               key={i}
-              className={`flex gap-4 ${turn.speaker === 'Elon Musk' ? 'flex-row-reverse' : ''}`}
+              className={`flex gap-4 ${turn.side === 'B' ? 'flex-row-reverse' : ''}`}
             >
               <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-lg font-bold ${turn.speaker === 'Einstein' ? 'bg-indigo-800 text-indigo-200' : 'bg-violet-800 text-violet-200'}`}>
                 {turn.speaker[0]}
