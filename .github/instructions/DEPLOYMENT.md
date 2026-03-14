@@ -130,14 +130,14 @@ Required for audio and image persistence (debate replay system).
 
 1. Go to Supabase dashboard → Storage → New bucket.
 2. Create bucket named `debate-audio`:
-   - Public: yes (allows public read of stored audio files)
+   - Enable **Public bucket** toggle: ON
 3. Create bucket named `debate-images`:
-   - Public: yes (allows public read of stored images)
-4. For each bucket, set the following RLS policy (under Storage → Policies):
-   - Allow INSERT for authenticated users: `(auth.role() = 'authenticated')`
-   - Allow SELECT for all (public): `true`
+   - Enable **Public bucket** toggle: ON
+4. No RLS policies needed on either bucket:
+   - Uploads go through the backend using `SUPABASE_SERVICE_ROLE_KEY`, which bypasses RLS entirely
+   - Public reads work automatically because the buckets are marked public
 
-The backend uses the service role key (`SUPABASE_SERVICE_ROLE_KEY`) to upload assets, bypassing RLS. The public read policy allows replay players to stream audio and show images directly from the storage URL.
+Both buckets should show **PUBLIC** badge and **0 policies** in the Storage → Buckets list — that is correct.
 
 If storage is not set up, debates will still work — audio and images will just not be persisted for replay. A 503 error will appear in server logs for each upload attempt.
 
