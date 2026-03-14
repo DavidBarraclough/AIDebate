@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { saveMessage, updateDebateSummary } from '../lib/debateDb'
 import { supabase } from '../lib/supabaseClient'
 
@@ -1098,8 +1099,11 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         }).join('\n')
       const data = await postJson('debate-summary', { transcript, nameA: namesRef.current.A, nameB: namesRef.current.B, topic })
       if (data.error) throw new Error(data.error)
-      setSummary(data)
-      setSummaryLoading(false) // Show summary immediately — before TTS starts
+      // Force immediate render of summary card before TTS starts
+      flushSync(() => {
+        setSummary(data)
+        setSummaryLoading(false)
+      })
 
       // Persist summary (fire-and-forget)
       if (debateIdRef.current) {
