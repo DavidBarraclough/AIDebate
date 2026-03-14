@@ -1,6 +1,7 @@
 import GeminiSelfChatAudio from './components/GeminiSelfChatAudio'
 import FeaturesHelpPage from './components/FeaturesHelpPage'
 import DebateHistory from './components/DebateHistory'
+import LandingPage from './components/LandingPage'
 import { useEffect, useState, useCallback } from 'react'
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient'
 
@@ -247,56 +248,13 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center p-6">
-        <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-6">
-          <h1 className="text-2xl font-bold text-white">AI Debate Studio</h1>
-          <p className="mt-2 text-sm text-gray-300">Sign in to start and save your debate progress.</p>
-
-          <div className="mt-4 inline-flex rounded-lg border border-gray-700 bg-gray-950 p-1">
-            <button
-              onClick={() => setAuthMode('signin')}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${authMode === 'signin' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => setAuthMode('signup')}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${authMode === 'signup' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              Sign Up
-            </button>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <input
-              type="email"
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
-              placeholder="Email"
-              autoComplete="email"
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-            />
-            <input
-              type="password"
-              value={authPassword}
-              onChange={(e) => setAuthPassword(e.target.value)}
-              placeholder="Password"
-              autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'}
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-            />
-            <button
-              onClick={authMode === 'signin' ? handleSignIn : handleSignUp}
-              disabled={authBusy}
-              className="w-full px-3 py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-sm font-medium transition-colors cursor-pointer"
-            >
-              {authBusy ? 'Working...' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
-            </button>
-          </div>
-
-          {authError && <p className="mt-3 text-sm text-red-300">{authError}</p>}
-          {authInfo && <p className="mt-3 text-sm text-green-300">{authInfo}</p>}
-        </div>
-      </div>
+      <LandingPage
+        authMode={authMode} setAuthMode={setAuthMode}
+        authEmail={authEmail} setAuthEmail={setAuthEmail}
+        authPassword={authPassword} setAuthPassword={setAuthPassword}
+        authBusy={authBusy} authError={authError} authInfo={authInfo}
+        handleSignIn={handleSignIn} handleSignUp={handleSignUp}
+      />
     )
   }
 
