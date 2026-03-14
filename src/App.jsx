@@ -295,51 +295,15 @@ export default function App() {
           {proActivationError}
         </div>
       )}
-      <header className="shrink-0 border-b border-gray-800 px-4 sm:px-6 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <header className="shrink-0 border-b border-gray-800 px-4 sm:px-6 py-3 space-y-2">
+        {/* Row 1: title + Pro badge + Log Out */}
+        <div className="flex items-center justify-between gap-2">
           <div>
             <h1 className="font-bold text-white" style={{ fontSize: 'clamp(16px, 2.5vw, 22px)' }}>AI Debate Studio</h1>
-            <p className="text-gray-400 mt-0.5" style={{ fontSize: 'clamp(11px, 1.2vw, 13px)' }}>Structured voice debates with live visual context.</p>
-            <p className="text-gray-500 mt-0.5" style={{ fontSize: 'clamp(10px, 1vw, 12px)' }}>Signed in as {user.email || user.id}</p>
+            <p className="text-gray-400 mt-0.5 hidden sm:block" style={{ fontSize: 'clamp(11px, 1.2vw, 13px)' }}>Structured voice debates with live visual context.</p>
+            <p className="text-gray-500 mt-0.5 hidden sm:block" style={{ fontSize: 'clamp(10px, 1vw, 12px)' }}>Signed in as {user.email || user.id}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-lg border border-gray-700 bg-gray-900 p-1">
-              <button
-                onClick={() => setActiveView('studio')}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'studio' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-              >
-                Studio
-              </button>
-              <button
-                onClick={() => setActiveView('history')}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'history' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-              >
-                History
-              </button>
-              <button
-                onClick={() => setActiveView('help')}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'help' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-              >
-                Features and Help
-              </button>
-            </div>
-            {activeView === 'studio' && (
-              <button
-                onClick={() => setShowApiKeyPanel(v => !v)}
-                className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 text-xs font-medium text-gray-200 hover:bg-gray-800 transition-colors cursor-pointer"
-              >
-                {showApiKeyPanel ? 'Hide API Key' : 'Open API Key Setup'}
-              </button>
-            )}
-            {!proLoading && !isPro && (
-              <button
-                onClick={handleUpgrade}
-                disabled={upgrading}
-                className="px-3 py-1.5 rounded-lg border border-amber-600/60 bg-amber-950/40 text-xs font-medium text-amber-300 hover:bg-amber-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-              >
-                {upgrading ? 'Opening...' : 'Upgrade to Pro · £8/mo'}
-              </button>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
             {isPro && (
               <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-900/60 text-indigo-300 border border-indigo-700/40">
                 Pro
@@ -350,9 +314,52 @@ export default function App() {
               disabled={authBusy}
               className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 text-xs font-medium text-gray-200 hover:bg-gray-800 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
-              {authBusy ? 'Signing out...' : 'Log Out'}
+              {authBusy ? '...' : 'Log Out'}
             </button>
           </div>
+        </div>
+
+        {/* Row 2: nav tabs + action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex rounded-lg border border-gray-700 bg-gray-900 p-1">
+            <button
+              onClick={() => setActiveView('studio')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'studio' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+            >
+              Studio
+            </button>
+            <button
+              onClick={() => setActiveView('history')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'history' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+            >
+              History
+            </button>
+            <button
+              onClick={() => setActiveView('help')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors cursor-pointer ${activeView === 'help' ? 'bg-indigo-700 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+            >
+              <span className="sm:hidden">Help</span>
+              <span className="hidden sm:inline">Features &amp; Help</span>
+            </button>
+          </div>
+          {activeView === 'studio' && (
+            <button
+              onClick={() => setShowApiKeyPanel(v => !v)}
+              className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 text-xs font-medium text-gray-200 hover:bg-gray-800 transition-colors cursor-pointer"
+            >
+              <span className="sm:hidden">API Key</span>
+              <span className="hidden sm:inline">{showApiKeyPanel ? 'Hide API Key' : 'API Key Setup'}</span>
+            </button>
+          )}
+          {!proLoading && !isPro && (
+            <button
+              onClick={handleUpgrade}
+              disabled={upgrading}
+              className="px-3 py-1.5 rounded-lg border border-amber-600/60 bg-amber-950/40 text-xs font-medium text-amber-300 hover:bg-amber-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              {upgrading ? '...' : <><span className="sm:hidden">Pro · £8</span><span className="hidden sm:inline">Upgrade to Pro · £8/mo</span></>}
+            </button>
+          )}
         </div>
 
         {activeView === 'studio' && showApiKeyPanel && (
