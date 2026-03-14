@@ -45,7 +45,7 @@ For each debate below:
 
 ## Curated Debate List
 
-### Tech Titans (`category = 'tech'`)
+### Tech Titans (`library_category = 'tech'`)
 
 | Title | Topic | Featured |
 |---|---|---|
@@ -54,7 +54,7 @@ For each debate below:
 | Sam Altman vs Elon Musk | Should AI Be Regulated | |
 | Tesla vs Edison | Who Really Invented the Future of Electricity | ✅ |
 
-### Philosophical Showdowns (`category = 'philosophy'`)
+### Philosophical Showdowns (`library_category = 'philosophy'`)
 
 | Title | Topic | Featured |
 |---|---|---|
@@ -62,7 +62,7 @@ For each debate below:
 | Plato vs Aristotle | What Is Knowledge | |
 | Kant vs Machiavelli | Should Leaders Be Moral | |
 
-### Big Questions (`category = 'world'`)
+### Big Questions (`library_category = 'world'`)
 
 | Title | Topic | Featured |
 |---|---|---|
@@ -70,7 +70,7 @@ For each debate below:
 | Democracy vs Technocracy | Should Experts Run Society | |
 | Capitalism vs Socialism | Which System Creates the Best Society | |
 
-### Viral / Entertaining (`category = 'fun'`)
+### Viral / Entertaining (`library_category = 'fun'`)
 
 | Title | Topic | Featured |
 |---|---|---|
@@ -101,8 +101,10 @@ Add to the `debates` table in Supabase:
 ```sql
 ALTER TABLE debates ADD COLUMN IF NOT EXISTS is_library boolean DEFAULT false;
 ALTER TABLE debates ADD COLUMN IF NOT EXISTS is_featured boolean DEFAULT false;
-ALTER TABLE debates ADD COLUMN IF NOT EXISTS category text;
+ALTER TABLE debates ADD COLUMN IF NOT EXISTS library_category text;
 ```
+
+**Important:** Do NOT reuse the existing `category` column. That column already stores the debate **generation style** (values: `wild-card`, `comedy`, `science`, `philosophy`). Library grouping uses `library_category` (values: `tech`, `philosophy`, `world`, `fun`) to avoid a collision.
 
 ---
 
@@ -118,7 +120,7 @@ Response shape:
     "id": "uuid",
     "title": "Elon Musk vs Mark Zuckerberg",
     "topic": "The Future of Artificial Intelligence",
-    "category": "tech",
+    "library_category": "tech",
     "is_featured": true,
     "name_a": "Elon Musk",
     "name_b": "Mark Zuckerberg",
@@ -159,7 +161,18 @@ A dedicated replay mode (separate from the live generation UI) that:
 
 ### Free user routing
 
-When a free user clicks "Begin Session" on the main debate UI, instead of generating a new debate, redirect them to the library and prompt upgrade to Pro.
+**Product decision required before implementing.** Two options:
+
+**Option A — Keep current model (10 free generations/day):** Free users can still generate debates up to the daily limit. The library is an *additional* feature shown on the homepage — extra content to explore, not a replacement for generation.
+
+**Option B — Replay-only free tier:** Free users cannot generate new debates at all. They can only watch library replays. "Begin Session" is locked behind Pro. This is the model described in phase-1-issues.md §2.1.
+
+Option B requires updating:
+- The pricing section on LandingPage.jsx (currently says "10 debates/day free")
+- App.jsx — block `start()` for non-Pro users and redirect to library
+- Marketing copy throughout
+
+**Default:** Assume Option A until explicitly decided otherwise. Do not remove free generation without product sign-off.
 
 ---
 
