@@ -368,21 +368,23 @@ Each page: transcript, images, verdict, share CTA. This creates organic search t
 
 # 4. Implementation Priority Order
 
-| Priority | Item | Status | Effort |
-|---|---|---|---|
-| 1 | Fix Stripe Pro activation bug | ✅ Done | — |
-| 2 | Fix image generation | ✅ Done | — |
-| 3 | Fix iPad layout clip | ✅ Done (UI redesign) | — |
-| 4 | Fix responsive typography | ✅ Done (Sora + clamp) | — |
-| 5 | Fix pause → summary bug | ✅ Done (manual only) | — |
-| 6 | Hide cost indicator | ✅ Done (behind toggle) | — |
-| 7 | Improve share page (header + CTA) | 🔄 Next | 1–2h |
-| 8 | Blob storage — audio + images (prereq for replay) | ⬜ | 4–6h |
-| 9 | Replay engine for free users | ⬜ Blocked by 8 | 4–6h |
-| 10 | Seed curated debate library | ⬜ Blocked by 8 | 2–4h |
-| 11 | Shareable verdict cards | ⬜ | 4–6h |
-| 12 | Homepage demo debate | ⬜ Blocked by 9 | 2–4h |
-| 13 | Debate library SEO pages | ⬜ Blocked by 10 | 6–10h |
+| Priority | Item | Status | Effort | Spec |
+|---|---|---|---|---|
+| 1 | Fix Stripe Pro activation bug | ✅ Done | — | |
+| 2 | Fix image generation | ✅ Done | — | |
+| 3 | Fix iPad layout clip | ✅ Done (UI redesign) | — | |
+| 4 | Fix responsive typography | ✅ Done (Sora + clamp) | — | |
+| 5 | Fix pause → summary bug | ✅ Done (manual only) | — | |
+| 6 | Hide cost indicator | ✅ Done (behind toggle) | — | |
+| 7 | Improve share page (header + CTA) | ✅ Done | — | |
+| 8 | Shareable verdict cards | ✅ Done (share button) | — | |
+| 9 | Blob storage — audio + images (prereq for replay) | 🔄 Next | 4–6h | section 2.2 above |
+| 10 | Replay engine for free users | ⬜ Blocked by 9 | 4–6h | section 2.3–2.4 above |
+| 11 | Seed curated debate library | ⬜ Blocked by 9 | 2–4h | [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) |
+| 12 | Homepage library section + replay UI | ⬜ Blocked by 10 | 4–6h | [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) |
+| 13 | OG image generation for share links | ⬜ Blocked by 9 | 2–3h | |
+| 14 | Homepage demo / featured debate | ⬜ Blocked by 10 | 2–4h | [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) |
+| 15 | Debate library SEO pages | ⬜ Blocked by 11 | 6–10h | |
 
 ---
 
