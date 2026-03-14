@@ -1,4 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim() || (import.meta.env.DEV ? 'http://localhost:3001' : '')
+
+const CATEGORY_LABELS = { tech: 'Tech', philosophy: 'Philosophy', world: 'World', fun: 'Fun' }
+const CATEGORY_COLORS = {
+  tech:       'bg-blue-900/50 text-blue-300 border-blue-700/40',
+  philosophy: 'bg-violet-900/50 text-violet-300 border-violet-700/40',
+  world:      'bg-green-900/50 text-green-300 border-green-700/40',
+  fun:        'bg-amber-900/50 text-amber-300 border-amber-700/40',
+}
 
 const EXAMPLE_DEBATE = [
   {
@@ -64,11 +75,19 @@ export default function LandingPage({
   handleSignIn, handleSignUp,
 }) {
   const [localMode, setLocalMode] = useState(authMode || 'signup')
+  const [library, setLibrary] = useState([])
 
   const syncMode = (m) => {
     setLocalMode(m)
     setAuthMode(m)
   }
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/library`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setLibrary(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans">
@@ -108,7 +127,7 @@ export default function LandingPage({
                 {localMode === 'signup' ? 'Create free account' : 'Welcome back'}
               </h2>
               <p className="text-xs text-gray-400 mb-4">
-                {localMode === 'signup' ? '10 free debates per day. No card required.' : 'Sign in to access your debates.'}
+                {localMode === 'signup' ? 'Watch curated debates free. Generate your own with Pro.' : 'Sign in to access your debates.'}
               </p>
 
               <div className="inline-flex rounded-lg border border-gray-700 bg-gray-950 p-1 mb-4">
@@ -160,6 +179,73 @@ export default function LandingPage({
           </div>
         </div>
       </section>
+
+      {/* Featured Debates library — only shown when library has debates */}
+      {library.length > 0 && (
+        <section className="max-w-6xl mx-auto px-6 py-14">
+          <div className="text-center mb-8">
+            <p className="text-xs font-semibold uppercase tracking-widest text-indigo-400 mb-2">Curated debates</p>
+            <h2 className="text-3xl font-bold text-white">Watch AI legends debate</h2>
+            <p className="mt-2 text-gray-400 text-sm">Free to watch — no account required</p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {library.map(debate => (
+              <Link
+                key={debate.id}
+                to={`/replay/${debate.id}`}
+                className="group rounded-2xl border border-gray-700/40 bg-gray-900/60 overflow-hidden hover:border-indigo-600/50 hover:bg-gray-900/80 transition-all"
+              >
+                {/* Thumbnail */}
+                <div className="relative aspect-video overflow-hidden bg-gray-800/60">
+                  {debate.thumbnail_url ? (
+                    <img src={debate.thumbnail_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-4xl font-black text-gray-700 select-none">
+                        {debate.name_a?.[0]}{debate.name_b?.[0]}
+                      </div>
+                    </div>
+                  )}
+                  {/* Play overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+                    <div className="w-12 h-12 rounded-full bg-indigo-600/90 flex items-center justify-center shadow-lg">
+                      <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+                    </div>
+                  </div>
+                  {/* Category badge */}
+                  {debate.library_category && (
+                    <div className="absolute top-2 left-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${CATEGORY_COLORS[debate.library_category] ?? 'bg-gray-800 text-gray-400 border-gray-700'}`}>
+                        {CATEGORY_LABELS[debate.library_category] ?? debate.library_category}
+                      </span>
+                    </div>
+                  )}
+                  {debate.is_featured && (
+                    <div className="absolute top-2 right-2">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-900/70 text-amber-300 border border-amber-700/40">Featured</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card body */}
+                <div className="px-4 py-3">
+                  <p className="text-sm font-semibold text-white leading-tight">
+                    {debate.name_a} <span className="text-gray-600 font-normal">vs</span> {debate.name_b}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{debate.topic}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-8 text-center">
+            <a href="#signup" className="inline-block px-6 py-2.5 rounded-xl border border-indigo-700/40 text-indigo-300 hover:text-indigo-200 hover:border-indigo-600 text-sm font-medium transition-colors">
+              Create your own with Pro →
+            </a>
+          </div>
+        </section>
+      )}
 
       {/* Example debate */}
       <section className="max-w-4xl mx-auto px-6 py-16">
@@ -223,11 +309,10 @@ export default function LandingPage({
             <h3 className="text-lg font-bold text-white mb-1">Free</h3>
             <p className="text-3xl font-extrabold text-white mb-4">£0<span className="text-sm font-normal text-gray-400">/mo</span></p>
             <ul className="space-y-2 text-sm text-gray-300">
-              <li className="flex gap-2"><span className="text-green-400">✓</span> 10 debates per day</li>
-              <li className="flex gap-2"><span className="text-green-400">✓</span> 4-turn debates</li>
-              <li className="flex gap-2"><span className="text-green-400">✓</span> Start image</li>
-              <li className="flex gap-2"><span className="text-green-400">✓</span> Shareable links</li>
-              <li className="flex gap-2"><span className="text-green-400">✓</span> Debate history</li>
+              <li className="flex gap-2"><span className="text-green-400">✓</span> Watch curated debates</li>
+              <li className="flex gap-2"><span className="text-green-400">✓</span> Full audio + AI images</li>
+              <li className="flex gap-2"><span className="text-green-400">✓</span> Shareable replay links</li>
+              <li className="flex gap-2"><span className="text-green-400">✓</span> New debates added weekly</li>
             </ul>
           </div>
           <div className="rounded-2xl border border-indigo-600/50 bg-indigo-950/30 p-6 relative">

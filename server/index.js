@@ -243,6 +243,59 @@ app.post('/api/debate/start', async (req, res) => {
   }
 })
 
+// Public library endpoint — returns curated debates with thumbnail URLs
+// No auth required (used on landing page before sign-in)
+app.get('/api/library', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Database not configured.' })
+  }
+  try {
+    const { data: debates, error: debatesError } = await supabaseAdmin
+      .from('debates')
+      .select('id, topic, name_a, name_b, summary, is_featured, library_category, style, created_at')
+      .eq('is_library', true)
+      .order('is_featured', { ascending: false })
+      .order('created_at', { ascending: true })
+
+    if (debatesError) throw debatesError
+    if (!debates?.length) return res.json([])
+
+    // Fetch the first stored image for each debate in one query
+    const debateIds = debates.map(d => d.id)
+    const { data: images, error: imgError } = await supabaseAdmin
+      .from('messages')
+      .select('debate_id, image_url')
+      .in('debate_id', debateIds)
+      .not('image_url', 'is', null)
+      .order('turn_index', { ascending: true })
+
+    if (imgError) throw imgError
+
+    // Map first image per debate
+    const thumbnailMap = {}
+    for (const m of images || []) {
+      if (!thumbnailMap[m.debate_id]) thumbnailMap[m.debate_id] = m.image_url
+    }
+
+    const result = debates.map(d => ({
+      id:               d.id,
+      topic:            d.topic,
+      name_a:           d.name_a,
+      name_b:           d.name_b,
+      is_featured:      d.is_featured,
+      library_category: d.library_category,
+      style:            d.style,
+      winner:           d.summary?.winner ?? null,
+      thumbnail_url:    thumbnailMap[d.id] ?? null,
+    }))
+
+    return res.json(result)
+  } catch (err) {
+    console.error('library error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/test-key', async (req, res) => {
   const apiKey = requireGeminiApiKey(req, res)
   if (!apiKey) return
