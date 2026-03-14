@@ -34,6 +34,8 @@ export default function App() {
   const [isPro, setIsPro] = useState(false)
   const [proLoading, setProLoading] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
+  const [proActivating, setProActivating] = useState(false)
+  const [proActivationError, setProActivationError] = useState('')
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return
@@ -94,22 +96,34 @@ export default function App() {
     const sessionId = params.get('session_id')
     if (!sessionId || !user || !supabase) return
 
-    // Clean URL immediately
+    // Clean URL immediately so a refresh doesn't re-trigger this
     window.history.replaceState({}, '', window.location.pathname)
 
     const confirmPayment = async () => {
+      setProActivating(true)
+      setProActivationError('')
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.access_token) return
+        if (!session?.access_token) {
+          setProActivationError('Session expired — please sign in again.')
+          return
+        }
+
         const res = await fetch(`${API_BASE}/api/stripe/confirm`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify({ sessionId }),
         })
-        if (!res.ok) return
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          setProActivationError(err.error || 'Payment confirmation failed. Please refresh the page.')
+          return
+        }
+
         const sub = await res.json()
+
         // Write subscription to Supabase using the user's own JWT (RLS allows this)
-        await supabase.from('subscriptions').upsert({
+        const { error: upsertError } = await supabase.from('subscriptions').upsert({
           user_id:                user.id,
           stripe_customer_id:     sub.stripeCustomerId,
           stripe_subscription_id: sub.stripeSubscriptionId,
@@ -117,14 +131,25 @@ export default function App() {
           current_period_end:     sub.currentPeriodEnd,
           updated_at:             new Date().toISOString(),
         }, { onConflict: 'user_id' })
-        setIsPro(sub.status === 'active')
+
+        if (upsertError) {
+          console.error('Subscription upsert failed:', upsertError.message)
+          setProActivationError('Pro activated but failed to save locally. Please refresh.')
+          return
+        }
+
+        // Re-fetch from DB to confirm write landed
+        await fetchProStatus(user)
       } catch (err) {
         console.error('Failed to confirm payment:', err)
+        setProActivationError('Something went wrong activating Pro. Please refresh the page.')
+      } finally {
+        setProActivating(false)
       }
     }
 
     confirmPayment()
-  }, [user])
+  }, [user, fetchProStatus])
 
   const handleUpgrade = async () => {
     if (!supabase || upgrading) return
@@ -259,7 +284,17 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen h-dvh flex flex-col bg-gray-950 text-gray-100 font-sans overflow-hidden">
+    <div className="min-h-screen h-dvh flex flex-col bg-gray-950 text-gray-100 font-sans overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      {proActivating && (
+        <div className="shrink-0 bg-indigo-900/60 border-b border-indigo-700/40 px-4 py-2 text-center text-sm text-indigo-200">
+          Activating Pro account...
+        </div>
+      )}
+      {proActivationError && (
+        <div className="shrink-0 bg-red-900/60 border-b border-red-700/40 px-4 py-2 text-center text-sm text-red-200">
+          {proActivationError}
+        </div>
+      )}
       <header className="shrink-0 border-b border-gray-800 px-4 sm:px-6 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>

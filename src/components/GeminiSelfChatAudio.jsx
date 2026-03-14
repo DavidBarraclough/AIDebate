@@ -1526,7 +1526,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   }
 
   return (
-    <div className={`h-full flex flex-col gap-3 uniform-text-scale ${draggingSplit ? 'dragging-split' : ''}`}>
+    <div className={`h-full flex flex-col gap-3 pb-4 lg:pb-0 uniform-text-scale ${draggingSplit ? 'dragging-split' : ''}`}>
       <style>{`
         @keyframes soundBar {
           from { transform: scaleY(0.3); }
