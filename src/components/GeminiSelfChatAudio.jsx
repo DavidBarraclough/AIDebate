@@ -1630,6 +1630,29 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                   {STYLES.find(s => s.value === style)?.label || style}
                 </span>
               )}
+              {/* Setup controls inline on desktop when not running */}
+              {!running && !paused && (
+                <>
+                  <div className="hidden lg:block relative shrink-0" title={!isPro ? 'Upgrade to Pro to change category' : undefined}>
+                    <select value={category} onChange={e => { if (isPro) setCategory(e.target.value) }} disabled={randomising} style={{ colorScheme: 'dark' }}
+                      className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
+                      {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>}
+                  </div>
+                  <div className="hidden lg:block relative shrink-0" title={!isPro ? 'Upgrade to Pro to change style' : undefined}>
+                    <select value={style} onChange={e => { if (isPro) setStyle(e.target.value) }} disabled={randomising} style={{ colorScheme: 'dark' }}
+                      className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
+                      {STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>}
+                  </div>
+                  <button onClick={randomise} disabled={randomising} title="Randomise characters and topic"
+                    className="hidden lg:flex px-4 py-2.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
+                    {randomising ? <span className="inline-block w-4 h-4 border-2 border-amber-100/80 border-t-transparent rounded-full animate-spin" /> : <IconDice className="w-5 h-5" />}
+                  </button>
+                </>
+              )}
               {/* Spacer pushes action buttons to the right */}
               <div className="flex-1" />
               {/* Primary action */}
@@ -1659,9 +1682,9 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
               </button>
             </div>
 
-            {/* Row 2: setup controls (before session) or generate summary (when paused) */}
+            {/* Row 2: setup controls on mobile only, or generate summary when paused */}
             {!running && !paused ? (
-              <div className="flex gap-2 flex-wrap items-center">
+              <div className="flex lg:hidden gap-2 flex-wrap items-center">
                 <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro to change category' : undefined}>
                   <select
                     value={category}
