@@ -805,6 +805,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   const [summary, setSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [verdictShared, setVerdictShared] = useState(false)
+  const [libraryTag, setLibraryTag] = useState({ status: 'idle', isFeatured: false, category: 'tech' }) // idle | saving | saved | error
   const [showStats, setShowStats] = useState(false)
   const [category, setCategory] = useState('wild-card')
   const [style, _setStyle] = useState('ai')
@@ -1570,6 +1571,34 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
     setVerdictShared(false)
   }
 
+  const isAdmin = !!(user?.id && import.meta.env.VITE_ADMIN_USER_ID && user.id === import.meta.env.VITE_ADMIN_USER_ID)
+
+  const handleTagLibrary = async () => {
+    const id = debateIdRef.current
+    if (!id) return
+    setLibraryTag(t => ({ ...t, status: 'saving' }))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Not signed in')
+      const res = await fetch(buildApiUrl('admin/tag-debate'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          debateId:        id,
+          isLibrary:       true,
+          isFeatured:      libraryTag.isFeatured,
+          libraryCategory: libraryTag.category,
+        }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || res.statusText)
+      setLibraryTag(t => ({ ...t, status: 'saved' }))
+    } catch (err) {
+      console.error('tag-library error:', err.message)
+      setLibraryTag(t => ({ ...t, status: 'error' }))
+    }
+  }
+
   const handleShareVerdict = async () => {
     const id = debateIdRef.current
     if (!id) return
@@ -1980,6 +2009,45 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                           <span className="text-[10px] text-gray-600 font-mono truncate">
                             /debate/{debateIdRef.current.slice(0, 8)}…
                           </span>
+                        </div>
+                      )}
+
+                      {/* Admin: Save to Library */}
+                      {isAdmin && debateIdRef.current && (
+                        <div className="flex items-center gap-2 pt-1 border-t border-amber-800/20">
+                          <select
+                            value={libraryTag.category}
+                            onChange={e => setLibraryTag(t => ({ ...t, category: e.target.value }))}
+                            disabled={libraryTag.status === 'saved'}
+                            style={{ colorScheme: 'dark' }}
+                            className="bg-gray-800 border border-white/8 rounded-lg px-2 py-1 text-xs text-gray-300 focus:outline-none cursor-pointer"
+                          >
+                            <option value="tech">Tech</option>
+                            <option value="philosophy">Philosophy</option>
+                            <option value="world">World</option>
+                            <option value="fun">Fun</option>
+                          </select>
+                          <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+                            <input type="checkbox" checked={libraryTag.isFeatured}
+                              onChange={e => setLibraryTag(t => ({ ...t, isFeatured: e.target.checked }))}
+                              disabled={libraryTag.status === 'saved'}
+                              className="rounded" />
+                            Featured
+                          </label>
+                          <button
+                            onClick={handleTagLibrary}
+                            disabled={libraryTag.status === 'saving' || libraryTag.status === 'saved'}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0
+                              ${libraryTag.status === 'saved' ? 'bg-green-900/40 text-green-400 border border-green-700/40' :
+                                libraryTag.status === 'error' ? 'bg-red-900/40 text-red-400 border border-red-700/40' :
+                                'bg-amber-900/40 hover:bg-amber-900/60 text-amber-300 border border-amber-700/40'}
+                              disabled:opacity-50`}
+                          >
+                            {libraryTag.status === 'saving' ? 'Saving…' :
+                             libraryTag.status === 'saved' ? '✓ In library' :
+                             libraryTag.status === 'error' ? 'Error — retry' :
+                             'Save to library'}
+                          </button>
                         </div>
                       )}
                     </div>

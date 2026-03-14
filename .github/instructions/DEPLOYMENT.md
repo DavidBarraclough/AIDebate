@@ -224,6 +224,10 @@ Local behavior:
 - STRIPE_WEBHOOK_SECRET=
 - SUPABASE_SERVICE_ROLE_KEY=
 - DAILY_DEBATE_LIMIT=10  # defaults to 10 if omitted — set higher temporarily for testing, always revert before leaving in production
+- ADMIN_USER_ID=         # Supabase user ID of the admin — enables "Save to library" on verdict card (server-side gate)
+
+### Vercel (frontend) — additional
+- VITE_ADMIN_USER_ID=    # Same value as ADMIN_USER_ID — controls visibility of admin UI in the browser
 
 ### Vercel (frontend)
 
