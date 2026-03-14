@@ -149,75 +149,118 @@ Summary must appear even for very short debates (1–2 turns).
 
 ## Objective
 
-Reduce AI API costs and latency by allowing free users to replay stored debates instead of triggering live generation.
+Reduce AI API costs and latency by allowing free users to replay stored debates instead of triggering live generation. Replays must include the full experience: spoken audio and generated images — not just text.
 
 ---
 
 ## 2.1 Free Plan Behaviour
 
+**Decision confirmed 14 March 2026: replay-only free tier.**
+
 Free users:
-- Watch replayed debates from the curated library
+- Watch replayed debates from the curated library (with audio + images)
 - Cannot generate new debates
 - All generative interaction features disabled:
-  - Challenge button
-  - Custom topics
+  - Custom topics / Begin Session
   - Image generation
   - Voice generation
+  - Challenge button
 
-Free users experience the full product feel without incurring API costs. This is the primary conversion funnel into Pro.
+Free users experience the full product feel (audio + images) via replays without incurring API costs. This is the primary conversion funnel into Pro.
+
+**Important:** Do not implement generation gating until the replay engine and library are live. The current 10/day limit remains as a stopgap until then. See [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) for full implementation detail.
 
 ---
 
-## 2.2 Stored Debate Data Model
+## 2.2 Blob Storage for Audio and Images
 
-These tables already exist in Supabase from Phase 1. Confirm schema matches:
+This is a **prerequisite** for the replay system. Without persisted audio and image files, replays cannot play back the full experience.
+
+### Storage provider
+Use **Supabase Storage** (already in stack). Create two buckets:
+- `debate-audio` — TTS audio per message turn (public read)
+- `debate-images` — Imagen-generated images per message turn (public read)
+
+### When to upload (during live debate generation)
+After each turn completes:
+1. **Audio**: the TTS response returns a base64 PCM blob → convert to WAV/MP3 → upload to `debate-audio/{debate_id}/{message_id}.mp3`
+2. **Image**: the Imagen response returns base64 PNG → upload to `debate-images/{debate_id}/{message_id}.png`
+3. Store the resulting **public Supabase Storage URLs** in the `messages` row (`audio_url`, `image_url`)
+
+### Current gap
+Currently audio is played directly from in-memory base64 blobs (never persisted) and images are stored as base64 strings in React state only. Neither survives page refresh or can be replayed later.
+
+### Backend endpoint needed
+Add `POST /api/debates/:debateId/messages/:messageId/upload-assets` (or handle inline in the existing turn endpoint) to:
+- Accept audio blob + image base64 from the frontend
+- Upload both to Supabase Storage
+- Return the public URLs
+- Update the `messages` row with both URLs
+
+### Frontend changes needed
+After each turn's audio plays:
+- Upload audio blob to backend
+- Upload image (if generated) to backend
+- Store returned URLs locally so the debate record is complete
+
+---
+
+## 2.3 Stored Debate Data Model
+
+These tables already exist in Supabase from Phase 1. Confirm schema matches and add missing fields:
 
 ### Table: `debates`
-| Field | Type |
-|---|---|
-| id | uuid |
-| title | text |
-| participants | text[] or jsonb |
-| topic | text |
-| created_at | timestamptz |
-| user_id | uuid (nullable for seeded debates) |
-| is_library | boolean (true = curated/public) |
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid | |
+| title | text | |
+| participants | text[] or jsonb | |
+| topic | text | |
+| created_at | timestamptz | |
+| user_id | uuid | nullable for seeded/library debates |
+| is_library | boolean | true = curated public replay |
+| summary | jsonb | optional — store verdict/winner/args |
+
+Add `is_library` and `summary` columns if not present.
 
 ### Table: `messages`
-| Field | Type |
-|---|---|
-| id | uuid |
-| debate_id | uuid |
-| speaker | text |
-| text | text |
-| image_url | text |
-| audio_url | text |
-| timestamp | timestamptz |
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid | |
+| debate_id | uuid | |
+| speaker | text | persona key e.g. "A", "B", "host" |
+| text | text | debate turn content |
+| image_url | text | Supabase Storage public URL |
+| audio_url | text | Supabase Storage public URL |
+| turn_index | integer | ordering within debate |
+| timestamp | timestamptz | |
 
-Add `is_library` flag to debates table if not present — this marks debates as part of the public replay library.
+Add `turn_index` if not present — required for ordered replay.
 
 ---
 
-## 2.3 Replay Engine
+## 2.4 Replay Engine
 
-When a free user selects a debate, replay from stored data instead of generating:
+When a free user selects a debate, replay from stored data:
 
 ```
-fetch debate from DB
-display messages sequentially
-play stored audio_url
-show stored image_url
+fetch debate + ordered messages from DB
+for each message (in turn_index order):
+  display message text
+  show image_url (if present)
+  play audio_url (if present)
+  wait for audio to finish (or fixed 5s interval if no audio)
 ```
 
 No AI calls are made. This eliminates API cost entirely for free users.
 
-Replay pacing: use stored timestamps or a fixed interval (e.g. 4–6 seconds per turn) to simulate natural debate flow.
+The replay engine is a separate mode — not the live debate component. It reads from DB, not from Gemini.
 
 ---
 
-## 2.4 Curated Debate Library
+## 2.5 Curated Debate Library
 
-Seed the database with a small set of high-quality pre-generated debates.
+Seed the database with a small set of high-quality pre-generated debates (with audio + images stored).
 
 Suggested initial library:
 - Einstein vs Elon Musk — AI Safety
@@ -228,20 +271,22 @@ Suggested initial library:
 - Darwin vs Creationism
 - AI vs Humanity — Future Ethics
 
-The "Random Debate" button for free users selects from this curated pool.
-
-**Seeding approach:** Generate these debates once in Pro mode, review them, mark `is_library = true`, and store permanently.
+**Seeding approach:**
+1. Generate each debate in Pro mode (live generation, audio + images on)
+2. Ensure all assets upload to Supabase Storage during generation
+3. Review the debate
+4. Mark `is_library = true` in the `debates` table
+5. Debate is now available to free users
 
 ---
 
-## 2.5 Pro-Generated Debates → Library Pipeline (Optional)
+## 2.6 Pro-Generated Debates → Library Pipeline (Optional)
 
 Allow high-quality Pro debates to feed the library over time:
 
-1. Pro user generates debate
-2. Debate stored in Supabase as normal
-3. Manual moderation/review step (admin marks `is_library = true`)
-4. Debate appears in the free library
+1. Pro user generates debate (assets auto-uploaded to Storage)
+2. Manual moderation/review step (admin marks `is_library = true`)
+3. Debate appears in the free library
 
 This creates a self-growing content archive without additional generation cost.
 
@@ -327,20 +372,23 @@ Each page: transcript, images, verdict, share CTA. This creates organic search t
 
 # 4. Implementation Priority Order
 
-| Priority | Item | Effort |
-|---|---|---|
-| 1 | Fix Stripe Pro activation bug | 2–4h |
-| 2 | Fix image generation | 1–3h |
-| 3 | Fix iPad layout clip | 1h |
-| 4 | Fix responsive typography | 1–2h |
-| 5 | Fix pause → summary bug | 1h |
-| 6 | Hide cost indicator | 30m |
-| 7 | Improve share page (header + CTA) | 1–2h |
-| 8 | Replay system for free users | 4–8h |
-| 9 | Seed curated debate library | 2–4h |
-| 10 | Shareable verdict cards | 4–6h |
-| 11 | Homepage demo debate | 2–4h |
-| 12 | Debate library SEO pages | 6–10h |
+| Priority | Item | Status | Effort | Spec |
+|---|---|---|---|---|
+| 1 | Fix Stripe Pro activation bug | ✅ Done | — | |
+| 2 | Fix image generation | ✅ Done | — | |
+| 3 | Fix iPad layout clip | ✅ Done (UI redesign) | — | |
+| 4 | Fix responsive typography | ✅ Done (Sora + clamp) | — | |
+| 5 | Fix pause → summary bug | ✅ Done (manual only) | — | |
+| 6 | Hide cost indicator | ✅ Done (behind toggle) | — | |
+| 7 | Improve share page (header + CTA) | ✅ Done | — | |
+| 8 | Shareable verdict cards | ✅ Done (share button) | — | |
+| 9 | Blob storage — audio + images (prereq for replay) | 🔄 Next | 4–6h | section 2.2 above |
+| 10 | Replay engine for free users | ⬜ Blocked by 9 | 4–6h | section 2.3–2.4 above |
+| 11 | Seed curated debate library | ⬜ Blocked by 9 | 2–4h | [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) |
+| 12 | Homepage library section + replay UI | ⬜ Blocked by 10 | 4–6h | [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) |
+| 13 | OG image generation for share links | ⬜ Blocked by 9 | 2–3h | |
+| 14 | Homepage demo / featured debate | ⬜ Blocked by 10 | 2–4h | [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) |
+| 15 | Debate library SEO pages | ⬜ Blocked by 11 | 6–10h | |
 
 ---
 
