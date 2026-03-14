@@ -137,6 +137,7 @@ if (!supabaseAdmin) {
 }
 
 const DAILY_DEBATE_LIMIT = parseInt(process.env.DAILY_DEBATE_LIMIT || '10', 10)
+const ADMIN_USER_ID = (process.env.ADMIN_USER_ID || '').trim()
 
 /**
  * Verify a Supabase JWT from the Authorization header.
@@ -292,6 +293,40 @@ app.get('/api/library', async (req, res) => {
     return res.json(result)
   } catch (err) {
     console.error('library error:', err.message)
+    return res.status(500).json({ error: err.message })
+  }
+})
+
+// Admin: tag a debate as part of the curated library
+// Gated by ADMIN_USER_ID env var — returns 403 for all other users
+app.post('/api/admin/tag-debate', async (req, res) => {
+  const user = await requireSupabaseUser(req, res)
+  if (!user) return
+
+  if (!ADMIN_USER_ID || user.id !== ADMIN_USER_ID) {
+    return res.status(403).json({ error: 'Admin only.' })
+  }
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Database not configured.' })
+  }
+
+  const { debateId, isLibrary, isFeatured, libraryCategory } = req.body
+  if (!debateId) return res.status(400).json({ error: 'debateId required.' })
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('debates')
+      .update({
+        is_library:       isLibrary ?? true,
+        is_featured:      isFeatured ?? false,
+        library_category: libraryCategory ?? null,
+      })
+      .eq('id', debateId)
+
+    if (error) throw error
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error('admin/tag-debate error:', err.message)
     return res.status(500).json({ error: err.message })
   }
 })
