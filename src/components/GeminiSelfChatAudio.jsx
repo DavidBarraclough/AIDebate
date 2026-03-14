@@ -874,8 +874,8 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   const imageKeys = Object.keys(images).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b)
   const latestIndex = imageKeys.length > 0 ? imageKeys[imageKeys.length - 1] : null
   const displayIndex = viewIndex !== null && images[viewIndex] != null ? viewIndex : latestIndex
-  // Fall back to bookend images when no per-turn image is selected
-  const displayImage = displayIndex !== null
+  // Fall back to bookend images when no per-turn image is selected or image is missing
+  const displayImage = (displayIndex !== null && images[displayIndex])
     ? images[displayIndex]
     : images.end || images.start || null
 
@@ -1099,6 +1099,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
       const data = await postJson('debate-summary', { transcript, nameA: namesRef.current.A, nameB: namesRef.current.B, topic })
       if (data.error) throw new Error(data.error)
       setSummary(data)
+      setSummaryLoading(false) // Show summary immediately — before TTS starts
 
       // Persist summary (fire-and-forget)
       if (debateIdRef.current) {
@@ -1576,21 +1577,21 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
           {/* Control buttons */}
           <div className="flex gap-2 shrink-0 flex-wrap">
             {running ? (
-              <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0">
+              <div className="flex items-center gap-2 px-3 py-2.5 lg:px-4 lg:py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0">
                 <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                 <span className="text-gray-300 font-mono">{formatTime(elapsed)}</span>
                 <span className="text-gray-600">/</span>
                 <span className="text-gray-500 font-mono">10:00</span>
               </div>
             ) : paused ? (
-              <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
+              <div className="flex items-center gap-2 px-3 py-2.5 lg:px-4 lg:py-3 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
                 <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
                 <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
                 <span className="text-gray-600">/</span>
                 <span className="text-gray-500 font-mono">10:00</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
+              <div className="flex items-center gap-2 px-3 py-2.5 lg:px-4 lg:py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
                 <IconClock className="w-4 h-4" />
                 <span>max 10 min</span>
               </div>
@@ -1602,14 +1603,14 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                 if (nextMuted && currentAudioRef.current) currentAudioRef.current.pause()
               }}
               title={muted ? 'Unmute' : 'Mute'}
-              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer border ${muted ? 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30' : 'bg-green-900 text-green-300 border-green-700/40'}`}
+              className={`px-3 py-2.5 lg:px-4 lg:py-3 rounded-xl text-base transition-colors cursor-pointer border ${muted ? 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30' : 'bg-green-900 text-green-300 border-green-700/40'}`}
             >
               {muted ? <IconVolumeOff /> : <IconVolumeOn />}
             </button>
             <button
               onClick={() => setImagesEnabled(m => !m)}
               title={imagesEnabled ? 'Disable image generation' : 'Enable image generation'}
-              className={`px-4 py-3 rounded-xl text-base transition-colors cursor-pointer border ${imagesEnabled ? 'bg-violet-900 text-violet-300 border-violet-700/40' : 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30'}`}
+              className={`px-3 py-2.5 lg:px-4 lg:py-3 rounded-xl text-base transition-colors cursor-pointer border ${imagesEnabled ? 'bg-violet-900 text-violet-300 border-violet-700/40' : 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30'}`}
             >
               <IconImage />
             </button>
@@ -1671,24 +1672,28 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
               </>
             )}
             {running && !paused ? (
-              <button onClick={pause} className="px-5 py-3 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                Pause Session
+              <button onClick={pause} className="px-4 py-2.5 lg:px-5 lg:py-3 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
+                <span className="hidden sm:inline">Pause Session</span>
+                <span className="sm:hidden">Pause</span>
               </button>
             ) : running && paused ? (
-              <button onClick={resumeDebate} className="px-5 py-3 bg-green-700 hover:bg-green-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                Resume Session
+              <button onClick={resumeDebate} className="px-4 py-2.5 lg:px-5 lg:py-3 bg-green-700 hover:bg-green-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
+                <span className="hidden sm:inline">Resume Session</span>
+                <span className="sm:hidden">Resume</span>
               </button>
             ) : (
-              <button onClick={start} disabled={!topic.trim()} className="px-5 py-3 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
-                Begin Session
+              <button onClick={start} disabled={!topic.trim()} className="px-4 py-2.5 lg:px-5 lg:py-3 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
+                <span className="hidden sm:inline">Begin Session</span>
+                <span className="sm:hidden">Begin</span>
               </button>
             )}
             <button
               onClick={reset}
               disabled={!running && !paused && messages.length === 0 && !topic.trim()}
-              className="px-5 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed rounded-xl text-base transition-colors cursor-pointer shrink-0"
+              className="px-4 py-2.5 lg:px-5 lg:py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed rounded-xl text-base transition-colors cursor-pointer shrink-0"
             >
-              Reset Session
+              <span className="hidden sm:inline">Reset Session</span>
+              <span className="sm:hidden">Reset</span>
             </button>
             {paused && !summaryLoading && (
               <button

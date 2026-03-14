@@ -136,7 +136,7 @@ if (!supabaseAdmin) {
   console.warn('SUPABASE_SERVICE_ROLE_KEY not set — webhook will not be able to write subscriptions to DB')
 }
 
-const DAILY_DEBATE_LIMIT = 10
+const DAILY_DEBATE_LIMIT = parseInt(process.env.DAILY_DEBATE_LIMIT || '10', 10)
 
 /**
  * Verify a Supabase JWT from the Authorization header.
