@@ -776,6 +776,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   const [emotions, setEmotions] = useState({ A: 'CONFIDENT', B: 'CONFIDENT' })
   const [summary, setSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [verdictShared, setVerdictShared] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [category, setCategory] = useState('wild-card')
   const [style, _setStyle] = useState('ai')
@@ -1528,6 +1529,24 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
     const freshVoices = { A: PERSONAS.A.defaultVoice, B: PERSONAS.B.defaultVoice }
     setVoices(freshVoices)
     voicesRef.current = { ...freshVoices }
+    setVerdictShared(false)
+  }
+
+  const handleShareVerdict = async () => {
+    const id = debateIdRef.current
+    if (!id) return
+    const url = `${window.location.origin}/debate/${id}`
+    const shareTitle = `${names.A} vs ${names.B}`
+    const shareText = summary?.winner
+      ? `${summary.winner === 'draw' ? 'Draw' : summary.winner === 'A' ? names.A : names.B} won the debate on "${topic}" — AI Debate Studio`
+      : `Watch ${names.A} vs ${names.B} debate "${topic}" — AI Debate Studio`
+    if (navigator.share) {
+      try { await navigator.share({ title: shareTitle, text: shareText, url }) } catch {}
+    } else {
+      await navigator.clipboard.writeText(url)
+      setVerdictShared(true)
+      setTimeout(() => setVerdictShared(false), 2500)
+    }
   }
 
   return (
@@ -1852,12 +1871,12 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                 </div>
               )}
 
-              {/* Summary card */}
+              {/* Summary / Verdict card */}
               {summary && !summaryLoading && (
                 <div className="flex gap-3 verdict-reveal">
                   <div className="w-0.5 rounded-full shrink-0 mt-1 bg-amber-400" style={{ minHeight: '1rem' }} />
                   <div className="flex-1 rounded-xl overflow-hidden border border-amber-700/30 bg-gradient-to-b from-amber-950/50 to-gray-900/60">
-                    {/* Header */}
+                    {/* Header row */}
                     <div className="px-4 py-2.5 bg-amber-900/20 border-b border-amber-700/20 flex items-center gap-3">
                       <span className="text-amber-400 text-[10px] font-mono font-semibold tracking-widest uppercase">Verdict</span>
                       <div className="flex-1 h-px bg-amber-700/20" />
@@ -1865,7 +1884,16 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                         <span className="text-amber-500/70 text-[10px] font-mono">{summary.confidence}% confidence</span>
                       )}
                     </div>
+
                     <div className="px-4 py-4 flex flex-col gap-3">
+                      {/* Topic + vs line */}
+                      <div className="flex flex-col gap-0.5">
+                        <p className="text-[11px] text-gray-500 font-mono uppercase tracking-wider">
+                          {names.A} <span className="text-gray-700">vs</span> {names.B}
+                        </p>
+                        <p className="text-sm font-semibold text-white/90 leading-snug">"{topic}"</p>
+                      </div>
+
                       {summary.winner && (
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-lg font-bold text-white">
@@ -1896,6 +1924,25 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                         <p className="text-xs text-gray-500 italic leading-relaxed border-t border-white/5 pt-2.5">
                           {summary.analysis}
                         </p>
+                      )}
+
+                      {/* Share row — only shown if debate was saved */}
+                      {debateIdRef.current && (
+                        <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                          <button
+                            onClick={handleShareVerdict}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                              bg-indigo-700/80 hover:bg-indigo-600 text-white transition-colors cursor-pointer"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            {verdictShared ? 'Link copied!' : 'Share debate'}
+                          </button>
+                          <span className="text-[10px] text-gray-600 font-mono truncate">
+                            /debate/{debateIdRef.current.slice(0, 8)}…
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
