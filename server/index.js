@@ -23,6 +23,93 @@ app.use(cors({
     return callback(new Error('CORS not allowed'))
   },
 }))
+
+// ─── Stripe webhook — must use raw body BEFORE express.json() ────────────────
+const stripeWebhookSecret = (process.env.STRIPE_WEBHOOK_SECRET || '').trim()
+
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured.' })
+  if (!stripeWebhookSecret) {
+    console.warn('STRIPE_WEBHOOK_SECRET not set — skipping signature verification')
+  }
+
+  let event
+  try {
+    if (stripeWebhookSecret) {
+      const sig = req.headers['stripe-signature']
+      event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret)
+    } else {
+      event = JSON.parse(req.body.toString())
+    }
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message)
+    return res.status(400).json({ error: `Webhook error: ${err.message}` })
+  }
+
+  if (event.type === 'checkout.session.completed' || event.type === 'customer.subscription.updated') {
+    try {
+      let userId, stripeCustomerId, stripeSubscriptionId, status, currentPeriodEnd
+
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object
+        if (session.payment_status !== 'paid') {
+          return res.json({ received: true })
+        }
+        userId = session.metadata?.userId
+        stripeCustomerId = session.customer
+        // Retrieve full subscription details
+        const sub = await stripe.subscriptions.retrieve(session.subscription)
+        stripeSubscriptionId = sub.id
+        status = sub.status
+        const cpe1 = sub.current_period_end
+        currentPeriodEnd = cpe1
+          ? (typeof cpe1 === 'number' ? new Date(cpe1 * 1000).toISOString() : new Date(cpe1).toISOString())
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      } else {
+        // customer.subscription.updated
+        const sub = event.data.object
+        stripeSubscriptionId = sub.id
+        stripeCustomerId = sub.customer
+        status = sub.status
+        const cpe2 = sub.current_period_end
+        currentPeriodEnd = cpe2
+          ? (typeof cpe2 === 'number' ? new Date(cpe2 * 1000).toISOString() : new Date(cpe2).toISOString())
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        // Look up userId from existing subscription record
+        if (supabaseAdmin) {
+          const { data } = await supabaseAdmin
+            .from('subscriptions')
+            .select('user_id')
+            .eq('stripe_subscription_id', stripeSubscriptionId)
+            .maybeSingle()
+          userId = data?.user_id
+        }
+      }
+
+      if (userId && supabaseAdmin) {
+        const { error } = await supabaseAdmin
+          .from('subscriptions')
+          .upsert({
+            user_id:                userId,
+            stripe_customer_id:     stripeCustomerId,
+            stripe_subscription_id: stripeSubscriptionId,
+            status,
+            current_period_end:     currentPeriodEnd,
+            updated_at:             new Date().toISOString(),
+          }, { onConflict: 'user_id' })
+        if (error) console.error('Webhook: Supabase upsert error:', error.message)
+        else console.log(`Webhook: subscription upserted for user ${userId} — status: ${status}`)
+      } else {
+        console.warn('Webhook: no userId or supabaseAdmin — subscription not written to DB')
+      }
+    } catch (err) {
+      console.error('Webhook processing error:', err.message)
+    }
+  }
+
+  res.json({ received: true })
+})
+
 app.use(express.json())
 app.use((req, _res, next) => { console.log(req.method, req.path); next() })
 
@@ -32,11 +119,22 @@ const stripePriceId   = (process.env.STRIPE_PRICE_ID   || '').trim()
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: '2025-05-28.basil' }) : null
 
 // ─── Supabase server client ──────────────────────────────────────────────────
-const supabaseUrl  = (process.env.SUPABASE_URL  || '').trim()
-const supabaseAnon = (process.env.SUPABASE_ANON_KEY || '').trim()
+const supabaseUrl         = (process.env.SUPABASE_URL          || '').trim()
+const supabaseAnon        = (process.env.SUPABASE_ANON_KEY     || '').trim()
+const supabaseServiceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
+
 const supabaseServer = supabaseUrl && supabaseAnon
   ? createClient(supabaseUrl, supabaseAnon)
   : null
+
+// Admin client bypasses RLS — used only for webhook writes where no user JWT is available
+const supabaseAdmin = supabaseUrl && supabaseServiceRole
+  ? createClient(supabaseUrl, supabaseServiceRole, { auth: { persistSession: false } })
+  : null
+
+if (!supabaseAdmin) {
+  console.warn('SUPABASE_SERVICE_ROLE_KEY not set — webhook will not be able to write subscriptions to DB')
+}
 
 const DAILY_DEBATE_LIMIT = 10
 
@@ -596,11 +694,27 @@ app.post('/api/stripe/confirm', async (req, res) => {
       return res.status(402).json({ error: 'Payment not completed.' })
     }
     const sub = session.subscription
+    console.log('stripe/confirm sub keys:', Object.keys(sub))
+    console.log('stripe/confirm current_period_end raw:', sub.current_period_end)
+
+    // current_period_end is a Unix timestamp in older API versions;
+    // newer Stripe API versions (clover) may return it as an ISO string or via items
+    let currentPeriodEnd = null
+    if (sub.current_period_end) {
+      const val = sub.current_period_end
+      currentPeriodEnd = typeof val === 'number'
+        ? new Date(val * 1000).toISOString()
+        : new Date(val).toISOString()
+    } else {
+      // Fallback: 30 days from now
+      currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
+
     return res.json({
       stripeCustomerId:     session.customer,
       stripeSubscriptionId: sub.id,
       status:               sub.status,
-      currentPeriodEnd:     new Date(sub.current_period_end * 1000).toISOString(),
+      currentPeriodEnd,
     })
   } catch (err) {
     console.error('stripe/confirm error:', err.message)
