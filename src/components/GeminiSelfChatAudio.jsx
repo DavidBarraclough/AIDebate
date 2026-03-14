@@ -776,6 +776,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   const [emotions, setEmotions] = useState({ A: 'CONFIDENT', B: 'CONFIDENT' })
   const [summary, setSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [showStats, setShowStats] = useState(false)
   const [category, setCategory] = useState('wild-card')
   const [style, _setStyle] = useState('ai')
   const setStyle = (v) => { styleRef.current = v; _setStyle(v) }
@@ -791,6 +792,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   const bottomRef = useRef(null)
   const stopRef = useRef(false)
   const pauseDebateRef = useRef(false)
+  const msgCountRef = useRef(0) // reliable message index for image keying
   const userInterruptRef = useRef(null)
   const recognitionRef = useRef(null)
   const personalitiesRef = useRef({ ...DEFAULT_PERSONALITIES })
@@ -1157,6 +1159,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
       // Fresh start
       setTelemetry(makeTelemetryState())
       setMessages([])
+      msgCountRef.current = 0
       setImages({})
       setViewIndex(null)
       setLastMessages({ A: '', B: '' })
@@ -1321,11 +1324,8 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         const { emotion, cleanText } = parseEmotion(reply)
         setEmotions(prev => ({ ...prev, [turn]: emotion }))
 
-        let msgIndex = -1
-        setMessages(prev => {
-          msgIndex = prev.length
-          return [...prev, { persona: turn, content: cleanText }]
-        })
+        const capturedIdx = msgCountRef.current++
+        setMessages(prev => [...prev, { persona: turn, content: cleanText }])
         setLastMessages(prev => ({ ...prev, [turn]: cleanText }))
 
         // Advance turn state NOW so pause/resume continues from the next turn
@@ -1336,7 +1336,6 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         // Image for this turn — Pro only, fire-and-forget
         const imagePrompt = `Cinematic photorealistic illustration of "${topic}". Dramatic lighting, high quality digital art. Absolutely no text, words, letters, numbers, or writing visible anywhere in the image.`
         if (imagesEnabledRef.current && isProRef.current) {
-          const capturedIdx = msgIndex
           postJson('image', { prompt: imagePrompt }).then(data => {
             if (data.error) {
               if (data.error.toLowerCase().includes('quota')) {
@@ -1492,6 +1491,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
     try { if (currentAudioRef.current?.stop) currentAudioRef.current.stop() } catch {}
     setRunning(false)
     setMessages([])
+    msgCountRef.current = 0
     setImages({})
     setViewIndex(null)
     setLastMessages({ A: '', B: '' })
@@ -2025,16 +2025,26 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
             </div>
           )}
 
-          {/* Session telemetry */}
-          <div className="shrink-0 rounded-xl bg-gray-800/70 border border-gray-700/70 px-4 py-3">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-gray-400">
-              <span>Session est. cost: <span className="font-semibold text-gray-100">~${estimatedSessionCost.toFixed(2)} USD</span></span>
-              <span>Calls: <span className="font-semibold text-gray-100">{totalApiCalls}</span></span>
-              <span>Turns: <span className="font-semibold text-gray-100">{usageTextTurns}</span></span>
-              <span>Voice: <span className="font-semibold text-gray-100">{usageVoiceGenerations}</span></span>
-              <span>Images: <span className="font-semibold text-gray-100">{usageImagesGenerated}</span></span>
-              <span>Fails: <span className="font-semibold text-gray-100">{totalFailures}</span></span>
-            </div>
+          {/* Session telemetry — collapsed by default */}
+          <div className="shrink-0">
+            <button
+              onClick={() => setShowStats(s => !s)}
+              className="text-xs text-gray-600 hover:text-gray-400 transition-colors cursor-pointer"
+            >
+              {showStats ? '▲ Hide stats' : '▼ Session stats'}
+            </button>
+            {showStats && (
+              <div className="mt-2 rounded-xl bg-gray-800/70 border border-gray-700/70 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-gray-400">
+                  <span>Session est. cost: <span className="font-semibold text-gray-100">~${estimatedSessionCost.toFixed(2)} USD</span></span>
+                  <span>Calls: <span className="font-semibold text-gray-100">{totalApiCalls}</span></span>
+                  <span>Turns: <span className="font-semibold text-gray-100">{usageTextTurns}</span></span>
+                  <span>Voice: <span className="font-semibold text-gray-100">{usageVoiceGenerations}</span></span>
+                  <span>Images: <span className="font-semibold text-gray-100">{usageImagesGenerated}</span></span>
+                  <span>Fails: <span className="font-semibold text-gray-100">{totalFailures}</span></span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
