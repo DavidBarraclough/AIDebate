@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { saveMessage, updateDebateSummary } from '../lib/debateDb'
 import { supabase } from '../lib/supabaseClient'
 
@@ -231,7 +232,7 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, name, onNa
   const p = PERSONAS[persona]
   const voiceLabel = VOICE_OPTIONS.find(v => v.value === voice)
   return (
-    <div className={`flex-1 rounded-xl p-5 ${p.avatarBg} flex flex-col items-center gap-3.5 transition-all duration-300
+    <div className={`flex-1 rounded-xl p-3 sm:p-5 ${p.avatarBg} flex flex-col items-center gap-2 sm:gap-3.5 transition-all duration-300
       ${isSpeaking ? `ring-2 ${p.ring} shadow-lg ${p.glow}` : 'ring-1 ring-white/10'}`}>
 
       {/* Details — right of circle */}
@@ -252,7 +253,7 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, name, onNa
                 <span>{EMOTIONS[emotion].label}</span>
               </span>
             )}
-            <span className="text-sm text-white/40 italic leading-tight line-clamp-2 max-w-full">{personality}</span>
+            <span className="hidden sm:block text-sm text-white/40 italic leading-tight line-clamp-2 max-w-full">{personality}</span>
           </>
         ) : (
           <input value={personality} onChange={e => onPersonalityChange(e.target.value)} placeholder="Personality…"
@@ -264,7 +265,7 @@ function AIAvatar({ persona, isSpeaking, isLoadingVoice, lastMessage, name, onNa
               ? <span className={`${p.barColor.replace('bg-', 'text-')} animate-pulse font-semibold text-xl`}>speaking…</span>
               : isLoadingVoice
                 ? <span className="text-cyan-400 animate-pulse font-medium">loading voice…</span>
-                : voiceLabel ? `${voiceLabel.label} · ${voiceLabel.desc}` : voice}
+                : <span className="hidden sm:inline">{voiceLabel ? `${voiceLabel.label} · ${voiceLabel.desc}` : voice}</span>}
           </span>
         ) : (
           <select value={voice} onChange={e => onVoiceChange(e.target.value)}
@@ -1098,8 +1099,11 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         }).join('\n')
       const data = await postJson('debate-summary', { transcript, nameA: namesRef.current.A, nameB: namesRef.current.B, topic })
       if (data.error) throw new Error(data.error)
-      setSummary(data)
-      setSummaryLoading(false) // Show summary immediately — before TTS starts
+      // Force immediate render of summary card before TTS starts
+      flushSync(() => {
+        setSummary(data)
+        setSummaryLoading(false)
+      })
 
       // Persist summary (fire-and-forget)
       if (debateIdRef.current) {
@@ -1574,55 +1578,99 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
         {/* Left: controls + transcript */}
         <div style={{ width: isMobile ? '100%' : `${splitPercent}%` }} className="w-full lg:shrink-0 bg-gray-900 rounded-xl p-5 flex flex-col gap-4 min-h-[50vh] lg:min-h-0">
-          {/* Control buttons */}
-          <div className="flex gap-2 shrink-0 flex-wrap">
-            {running ? (
-              <div className="flex items-center gap-2 px-3 py-2.5 lg:px-4 lg:py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-gray-300 font-mono">{formatTime(elapsed)}</span>
-                <span className="text-gray-600">/</span>
-                <span className="text-gray-500 font-mono">10:00</span>
-              </div>
-            ) : paused ? (
-              <div className="flex items-center gap-2 px-3 py-2.5 lg:px-4 lg:py-3 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
-                <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
-                <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
-                <span className="text-gray-600">/</span>
-                <span className="text-gray-500 font-mono">10:00</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-2.5 lg:px-4 lg:py-3 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
-                <IconClock className="w-4 h-4" />
-                <span>max 10 min</span>
-              </div>
-            )}
-            <button
-              onClick={() => {
-                const nextMuted = !mutedRef.current
-                setMuted(nextMuted)
-                if (nextMuted && currentAudioRef.current) currentAudioRef.current.pause()
-              }}
-              title={muted ? 'Unmute' : 'Mute'}
-              className={`px-3 py-2.5 lg:px-4 lg:py-3 rounded-xl text-base transition-colors cursor-pointer border ${muted ? 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30' : 'bg-green-900 text-green-300 border-green-700/40'}`}
-            >
-              {muted ? <IconVolumeOff /> : <IconVolumeOn />}
-            </button>
-            <button
-              onClick={() => setImagesEnabled(m => !m)}
-              title={imagesEnabled ? 'Disable image generation' : 'Enable image generation'}
-              className={`px-3 py-2.5 lg:px-4 lg:py-3 rounded-xl text-base transition-colors cursor-pointer border ${imagesEnabled ? 'bg-violet-900 text-violet-300 border-violet-700/40' : 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30'}`}
-            >
-              <IconImage />
-            </button>
+          {/* Control buttons — row 1: timer + toggles + primary action */}
+          <div className="flex flex-col gap-2 shrink-0">
+            <div className="flex items-center gap-2">
+              {/* Timer */}
+              {running ? (
+                <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0">
+                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                  <span className="text-gray-300 font-mono">{formatTime(elapsed)}</span>
+                  <span className="text-gray-600 hidden sm:inline">/</span>
+                  <span className="text-gray-500 font-mono hidden sm:inline">10:00</span>
+                </div>
+              ) : paused ? (
+                <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
+                  <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
+                  <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
+                  <span className="text-gray-600 hidden sm:inline">/</span>
+                  <span className="text-gray-500 font-mono hidden sm:inline">10:00</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
+                  <IconClock className="w-4 h-4" />
+                  <span className="hidden sm:inline">max 10 min</span>
+                </div>
+              )}
+              {/* Toggles */}
+              <button
+                onClick={() => {
+                  const nextMuted = !mutedRef.current
+                  setMuted(nextMuted)
+                  if (nextMuted && currentAudioRef.current) currentAudioRef.current.pause()
+                }}
+                title={muted ? 'Unmute' : 'Mute'}
+                className={`px-3 py-2.5 rounded-xl text-base transition-colors cursor-pointer border ${muted ? 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30' : 'bg-green-900 text-green-300 border-green-700/40'}`}
+              >
+                {muted ? <IconVolumeOff /> : <IconVolumeOn />}
+              </button>
+              <button
+                onClick={() => setImagesEnabled(m => !m)}
+                title={imagesEnabled ? 'Disable image generation' : 'Enable image generation'}
+                className={`px-3 py-2.5 rounded-xl text-base transition-colors cursor-pointer border ${imagesEnabled ? 'bg-violet-900 text-violet-300 border-violet-700/40' : 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30'}`}
+              >
+                <IconImage />
+              </button>
+              {/* Category badge — desktop only when running */}
+              {(running || paused) && (
+                <span className="hidden sm:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-sm font-medium shrink-0">
+                  {CATEGORIES.find(c => c.value === category)?.label || category}
+                </span>
+              )}
+              {(running || paused) && style !== 'ai' && (
+                <span className="hidden sm:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-sm font-medium shrink-0">
+                  {STYLES.find(s => s.value === style)?.label || style}
+                </span>
+              )}
+              {/* Spacer pushes action buttons to the right */}
+              <div className="flex-1" />
+              {/* Primary action */}
+              {running && !paused ? (
+                <button onClick={pause} className="px-4 py-2.5 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
+                  <span className="hidden sm:inline">Pause Session</span>
+                  <span className="sm:hidden">Pause</span>
+                </button>
+              ) : running && paused ? (
+                <button onClick={resumeDebate} className="px-4 py-2.5 bg-green-700 hover:bg-green-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
+                  <span className="hidden sm:inline">Resume Session</span>
+                  <span className="sm:hidden">Resume</span>
+                </button>
+              ) : (
+                <button onClick={start} disabled={!topic.trim()} className="px-4 py-2.5 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
+                  <span className="hidden sm:inline">Begin Session</span>
+                  <span className="sm:hidden">Begin</span>
+                </button>
+              )}
+              <button
+                onClick={reset}
+                disabled={!running && !paused && messages.length === 0 && !topic.trim()}
+                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed rounded-xl text-base transition-colors cursor-pointer shrink-0"
+              >
+                <span className="hidden sm:inline">Reset Session</span>
+                <span className="sm:hidden">Reset</span>
+              </button>
+            </div>
+
+            {/* Row 2: setup controls (before session) or generate summary (when paused) */}
             {!running && !paused ? (
-              <>
+              <div className="flex gap-2 flex-wrap items-center">
                 <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro to change category' : undefined}>
                   <select
                     value={category}
                     onChange={e => { if (isPro) setCategory(e.target.value) }}
                     disabled={randomising}
                     style={{ colorScheme: 'dark' }}
-                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
+                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
                   >
                     {CATEGORIES.map(c => (
                       <option key={c.value} value={c.value}>{c.label}</option>
@@ -1638,7 +1686,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                     onChange={e => { if (isPro) setStyle(e.target.value) }}
                     disabled={randomising}
                     style={{ colorScheme: 'dark' }}
-                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-3 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
+                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
                   >
                     {STYLES.map(s => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -1652,58 +1700,22 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                   onClick={randomise}
                   disabled={randomising}
                   title="Randomise characters and topic"
-                  className="px-4 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
+                  className="px-4 py-2.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
                 >
                   {randomising
                     ? <span className="inline-block w-4 h-4 border-2 border-amber-100/80 border-t-transparent rounded-full animate-spin" />
                     : <IconDice className="w-5 h-5" />}
                 </button>
-              </>
-            ) : (
-              <>
-                <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-sm font-medium shrink-0">
-                  {CATEGORIES.find(c => c.value === category)?.label || category}
-                </span>
-                {style !== 'ai' && (
-                  <span className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-sm font-medium shrink-0">
-                    {STYLES.find(s => s.value === style)?.label || style}
-                  </span>
-                )}
-              </>
-            )}
-            {running && !paused ? (
-              <button onClick={pause} className="px-4 py-2.5 lg:px-5 lg:py-3 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                <span className="hidden sm:inline">Pause Session</span>
-                <span className="sm:hidden">Pause</span>
-              </button>
-            ) : running && paused ? (
-              <button onClick={resumeDebate} className="px-4 py-2.5 lg:px-5 lg:py-3 bg-green-700 hover:bg-green-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                <span className="hidden sm:inline">Resume Session</span>
-                <span className="sm:hidden">Resume</span>
-              </button>
-            ) : (
-              <button onClick={start} disabled={!topic.trim()} className="px-4 py-2.5 lg:px-5 lg:py-3 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
-                <span className="hidden sm:inline">Begin Session</span>
-                <span className="sm:hidden">Begin</span>
-              </button>
-            )}
-            <button
-              onClick={reset}
-              disabled={!running && !paused && messages.length === 0 && !topic.trim()}
-              className="px-4 py-2.5 lg:px-5 lg:py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed rounded-xl text-base transition-colors cursor-pointer shrink-0"
-            >
-              <span className="hidden sm:inline">Reset Session</span>
-              <span className="sm:hidden">Reset</span>
-            </button>
-            {paused && !summaryLoading && (
+              </div>
+            ) : paused && !summaryLoading ? (
               <button
                 onClick={fetchSummary}
                 disabled={messages.length < 2 || !!summary}
-                className="px-5 py-3 bg-amber-700 hover:bg-amber-600 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
+                className="w-full sm:w-auto px-5 py-2.5 bg-amber-700 hover:bg-amber-600 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-base font-medium transition-colors cursor-pointer"
               >
                 Generate Summary
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Topic input — below controls */}
