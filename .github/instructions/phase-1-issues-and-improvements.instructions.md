@@ -155,16 +155,20 @@ Reduce AI API costs and latency by allowing free users to replay stored debates 
 
 ## 2.1 Free Plan Behaviour
 
+**Decision confirmed 14 March 2026: replay-only free tier.**
+
 Free users:
-- Watch replayed debates from the curated library
+- Watch replayed debates from the curated library (with audio + images)
 - Cannot generate new debates
 - All generative interaction features disabled:
-  - Challenge button
-  - Custom topics
+  - Custom topics / Begin Session
   - Image generation
   - Voice generation
+  - Challenge button
 
-Free users experience the full product feel (audio + images) without incurring API costs. This is the primary conversion funnel into Pro.
+Free users experience the full product feel (audio + images) via replays without incurring API costs. This is the primary conversion funnel into Pro.
+
+**Important:** Do not implement generation gating until the replay engine and library are live. The current 10/day limit remains as a stopgap until then. See [curated-debate-library.instructions.md](./curated-debate-library.instructions.md) for full implementation detail.
 
 ---
 

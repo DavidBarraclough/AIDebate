@@ -161,18 +161,18 @@ A dedicated replay mode (separate from the live generation UI) that:
 
 ### Free user routing
 
-**Product decision required before implementing.** Two options:
+**Decision: Option B — Replay-only free tier.** *(Confirmed 14 March 2026)*
 
-**Option A — Keep current model (10 free generations/day):** Free users can still generate debates up to the daily limit. The library is an *additional* feature shown on the homepage — extra content to explore, not a replacement for generation.
+Free users cannot generate new debates. They can only watch library replays. Pro is required to generate.
 
-**Option B — Replay-only free tier:** Free users cannot generate new debates at all. They can only watch library replays. "Begin Session" is locked behind Pro. This is the model described in phase-1-issues.md §2.1.
+Implementation changes required:
+- **LandingPage.jsx** — update pricing copy: free tier no longer says "10 debates/day". Replace with "Watch curated debates free. Generate your own with Pro."
+- **App.jsx** — in `start()` / "Begin Session" handler, block non-Pro users: show an upgrade prompt or redirect to the library instead of starting generation
+- **GeminiSelfChatAudio.jsx** — "Begin Session" button should be gated: disabled + tooltip for free users, or replaced with "Upgrade to generate" CTA
+- **server/index.js** — `DAILY_DEBATE_LIMIT` enforcement can be removed or set to 0 for free users once gating is in the frontend; keep server-side check as a safety fallback
+- **Marketing copy** — the value proposition for free tier is now: experience the full product (audio + images) via curated replays, then upgrade to create your own
 
-Option B requires updating:
-- The pricing section on LandingPage.jsx (currently says "10 debates/day free")
-- App.jsx — block `start()` for non-Pro users and redirect to library
-- Marketing copy throughout
-
-**Default:** Assume Option A until explicitly decided otherwise. Do not remove free generation without product sign-off.
+Do not implement until blob storage (item #9) and the replay engine (item #10) are working — free users need something to watch before generation is removed from their tier.
 
 ---
 
