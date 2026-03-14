@@ -75,6 +75,7 @@ If Supabase Auth/Database are introduced in Phase 1 or Phase 2, keep this hostin
    - STRIPE_PRICE_ID=price_... (from Stripe dashboard → Products → your Pro plan price ID)
    - STRIPE_WEBHOOK_SECRET=whsec_... (from Stripe dashboard → Developers → Webhooks → your endpoint → Signing secret)
    - SUPABASE_SERVICE_ROLE_KEY=... (from Supabase dashboard → Project Settings → API → service_role key — keep secret, server-only)
+   - DAILY_DEBATE_LIMIT=10 (optional — defaults to 10 if omitted. Increase temporarily for testing, e.g. set to 999, then revert to 10 for production)
 5. Deploy.
 6. Copy your backend URL, for example:
    - https://your-api.onrender.com
@@ -205,6 +206,7 @@ Local behavior:
 - STRIPE_PRICE_ID=
 - STRIPE_WEBHOOK_SECRET=
 - SUPABASE_SERVICE_ROLE_KEY=
+- DAILY_DEBATE_LIMIT=10  # defaults to 10 if omitted — set higher temporarily for testing, always revert before leaving in production
 
 ### Vercel (frontend)
 
