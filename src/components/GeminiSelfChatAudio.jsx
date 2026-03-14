@@ -870,10 +870,14 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
   const usageVoiceGenerations = telemetry.calls.tts || 0
   const usageImagesGenerated = telemetry.calls.image || 0
 
-  const imageKeys = Object.keys(images).map(Number).sort((a, b) => a - b)
+  // Only numeric keys are per-turn images; 'start'/'end' are bookends
+  const imageKeys = Object.keys(images).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b)
   const latestIndex = imageKeys.length > 0 ? imageKeys[imageKeys.length - 1] : null
   const displayIndex = viewIndex !== null && images[viewIndex] != null ? viewIndex : latestIndex
-  const displayImage = displayIndex !== null ? images[displayIndex] : null
+  // Fall back to bookend images when no per-turn image is selected
+  const displayImage = displayIndex !== null
+    ? images[displayIndex]
+    : images.end || images.start || null
 
   useEffect(() => {
     return () => { try { if (currentAudioRef.current?.stop) currentAudioRef.current.stop() } catch {} }
@@ -1324,8 +1328,22 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         lastMessageRef.current = reply
         currentTurnRef.current = nextTurn
 
-        // Image for this turn — use prefetched data or fetch fresh
+        // Image for this turn — Pro only, fire-and-forget
         const imagePrompt = `Cinematic photorealistic illustration of "${topic}". Dramatic lighting, high quality digital art. Absolutely no text, words, letters, numbers, or writing visible anywhere in the image.`
+        if (imagesEnabledRef.current && isProRef.current) {
+          const capturedIdx = msgIndex
+          postJson('image', { prompt: imagePrompt }).then(data => {
+            if (data.error) {
+              if (data.error.toLowerCase().includes('quota')) {
+                setImagesEnabled(false)
+                setQuotaAlerts(prev => ({ ...prev, image: true }))
+                trackQuotaHit('image')
+              }
+            } else if (data.imageData) {
+              setImages(prev => ({ ...prev, [capturedIdx]: `data:${data.mimeType};base64,${data.imageData}` }))
+            }
+          }).catch(err => console.error('Turn image error:', err))
+        }
 
         // Persist message (fire-and-forget)
         if (debateIdRef.current) {
