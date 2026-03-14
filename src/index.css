@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+html {
+  /* Prevent iOS Safari from inflating font sizes in landscape */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Responsive base body text */
+body {
+  font-size: clamp(14px, 1.8vw, 16px);
+}

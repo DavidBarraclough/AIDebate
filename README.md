@@ -1,5 +1,9 @@
 # React + Vite
 
+## Deployment
+
+For full hosting instructions (Vercel + Render), see [.github/instructions/DEPLOYMENT.md](.github/instructions/DEPLOYMENT.md).
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
