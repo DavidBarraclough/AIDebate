@@ -1576,178 +1576,163 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
         {/* Left: controls + transcript */}
         <div style={{ width: isMobile ? '100%' : `${splitPercent}%` }} className="w-full lg:shrink-0 bg-gray-900 rounded-xl p-5 flex flex-col gap-4 min-h-[50vh] lg:min-h-0">
-          {/* Control buttons — row 1: timer + toggles + primary action */}
-          <div className="flex flex-col gap-2 shrink-0">
-            <div className="flex items-center gap-2">
-              {/* Timer */}
-              {running ? (
-                <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0">
-                  <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-gray-300 font-mono">{formatTime(elapsed)}</span>
-                  <span className="text-gray-600 hidden lg:inline">/</span>
-                  <span className="text-gray-500 font-mono hidden lg:inline">10:00</span>
-                </div>
-              ) : paused ? (
-                <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
-                  <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
-                  <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
-                  <span className="text-gray-600 hidden lg:inline">/</span>
-                  <span className="text-gray-500 font-mono hidden lg:inline">10:00</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
-                  <IconClock className="w-4 h-4" />
-                  <span className="hidden sm:inline">max 10 min</span>
-                </div>
-              )}
-              {/* Toggles */}
-              <button
-                onClick={() => {
-                  const nextMuted = !mutedRef.current
-                  setMuted(nextMuted)
-                  if (nextMuted && currentAudioRef.current) currentAudioRef.current.pause()
-                }}
-                title={muted ? 'Unmute' : 'Mute'}
-                className={`px-3 py-2.5 rounded-xl text-base transition-colors cursor-pointer border ${muted ? 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30' : 'bg-green-900 text-green-300 border-green-700/40'}`}
-              >
-                {muted ? <IconVolumeOff /> : <IconVolumeOn />}
-              </button>
-              <button
-                onClick={() => setImagesEnabled(m => !m)}
-                title={imagesEnabled ? 'Disable image generation' : 'Enable image generation'}
-                className={`px-3 py-2.5 rounded-xl text-base transition-colors cursor-pointer border ${imagesEnabled ? 'bg-violet-900 text-violet-300 border-violet-700/40' : 'bg-gray-800/90 text-red-300 border-red-700/50 ring-1 ring-red-700/30'}`}
-              >
-                <IconImage />
-              </button>
-              {/* Category badge — split-view only (lg+) */}
-              {(running || paused) && (
-                <span className="hidden lg:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-sm font-medium shrink-0">
-                  {CATEGORIES.find(c => c.value === category)?.label || category}
-                </span>
-              )}
-              {(running || paused) && style !== 'ai' && (
-                <span className="hidden lg:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-sm font-medium shrink-0">
-                  {STYLES.find(s => s.value === style)?.label || style}
-                </span>
-              )}
-              {/* Setup controls inline on desktop when not running */}
-              {!running && !paused && (
-                <>
-                  <div className="hidden lg:block relative shrink-0" title={!isPro ? 'Upgrade to Pro to change category' : undefined}>
+          {/* Control bar — state driven */}
+          <div className="shrink-0">
+
+            {/* ── SETUP ── */}
+            {!running && !paused && (
+              <div className="flex flex-col gap-2.5">
+
+                {/* Desktop: single row with clock, selects, dice, spacer, Begin, Reset */}
+                <div className="hidden lg:flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800/60 border border-white/5 text-gray-500 shrink-0">
+                    <IconClock className="w-3.5 h-3.5" />
+                    <span className="font-mono text-sm">10:00</span>
+                  </div>
+                  <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro' : undefined}>
                     <select value={category} onChange={e => { if (isPro) setCategory(e.target.value) }} disabled={randomising} style={{ colorScheme: 'dark' }}
-                      className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
+                      className={`bg-gray-800 border border-white/8 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500/60 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
                       {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
-                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>}
+                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs">🔒</span>}
                   </div>
-                  <div className="hidden lg:block relative shrink-0" title={!isPro ? 'Upgrade to Pro to change style' : undefined}>
+                  <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro' : undefined}>
                     <select value={style} onChange={e => { if (isPro) setStyle(e.target.value) }} disabled={randomising} style={{ colorScheme: 'dark' }}
-                      className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
+                      className={`bg-gray-800 border border-white/8 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500/60 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
                       {STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
-                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>}
+                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs">🔒</span>}
                   </div>
-                  <button onClick={randomise} disabled={randomising} title="Randomise characters and topic"
-                    className="hidden lg:flex px-4 py-2.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                    {randomising ? <span className="inline-block w-4 h-4 border-2 border-amber-100/80 border-t-transparent rounded-full animate-spin" /> : <IconDice className="w-5 h-5" />}
+                  <button onClick={randomise} disabled={randomising} title="Randomise"
+                    className="flex items-center justify-center w-9 h-9 bg-amber-700/80 hover:bg-amber-600 disabled:opacity-40 rounded-lg transition-colors cursor-pointer shrink-0">
+                    {randomising ? <span className="w-3.5 h-3.5 border-2 border-amber-100/80 border-t-transparent rounded-full animate-spin" /> : <IconDice className="w-4 h-4" />}
                   </button>
-                </>
-              )}
-              {/* Spacer pushes action buttons to the right */}
-              <div className="flex-1" />
-              {/* Primary action */}
-              {running && !paused ? (
-                <button onClick={pause} className="px-4 py-2.5 bg-yellow-700 hover:bg-yellow-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                  <span className="hidden sm:inline">Pause Session</span>
-                  <span className="sm:hidden">Pause</span>
-                </button>
-              ) : running && paused ? (
-                <button onClick={resumeDebate} className="px-4 py-2.5 bg-green-700 hover:bg-green-600 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0">
-                  <span className="hidden sm:inline">Resume Session</span>
-                  <span className="sm:hidden">Resume</span>
-                </button>
-              ) : (
-                <button onClick={start} disabled={!topic.trim()} className="px-4 py-2.5 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0 disabled:opacity-40 bg-indigo-600 hover:bg-indigo-500">
-                  <span className="hidden sm:inline">Begin Session</span>
-                  <span className="sm:hidden">Begin</span>
-                </button>
-              )}
-              <button
-                onClick={reset}
-                disabled={!running && !paused && messages.length === 0 && !topic.trim()}
-                className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed rounded-xl text-base transition-colors cursor-pointer shrink-0"
-              >
-                <span className="hidden sm:inline">Reset Session</span>
-                <span className="sm:hidden">Reset</span>
-              </button>
-            </div>
+                  <div className="flex-1" />
+                  <button onClick={start} disabled={!topic.trim()}
+                    className="px-5 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer shrink-0
+                      bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed
+                      ring-1 ring-indigo-500/30 shadow-lg shadow-indigo-900/30">
+                    Begin Session
+                  </button>
+                  {(messages.length > 0 || topic.trim()) && (
+                    <button onClick={reset}
+                      className="px-3 py-2 rounded-lg text-sm border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 transition-colors cursor-pointer shrink-0">
+                      Reset
+                    </button>
+                  )}
+                </div>
 
-            {/* Row 2: setup controls on mobile only, or generate summary when paused */}
-            {!running && !paused ? (
-              <div className="flex lg:hidden gap-2 flex-wrap items-center">
-                <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro to change category' : undefined}>
-                  <select
-                    value={category}
-                    onChange={e => { if (isPro) setCategory(e.target.value) }}
-                    disabled={randomising}
-                    style={{ colorScheme: 'dark' }}
-                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
-                  >
-                    {CATEGORIES.map(c => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                  {!isPro && (
-                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>
+                {/* Mobile row 1: category / style / dice */}
+                <div className="flex lg:hidden gap-2 items-center">
+                  <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro' : undefined}>
+                    <select value={category} onChange={e => { if (isPro) setCategory(e.target.value) }} disabled={randomising} style={{ colorScheme: 'dark' }}
+                      className={`bg-gray-800 border border-white/8 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500/60 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
+                      {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs">🔒</span>}
+                  </div>
+                  <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro' : undefined}>
+                    <select value={style} onChange={e => { if (isPro) setStyle(e.target.value) }} disabled={randomising} style={{ colorScheme: 'dark' }}
+                      className={`bg-gray-800 border border-white/8 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500/60 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}>
+                      {STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                    {!isPro && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs">🔒</span>}
+                  </div>
+                  <button onClick={randomise} disabled={randomising} title="Randomise"
+                    className="flex items-center justify-center w-9 h-9 bg-amber-700/80 hover:bg-amber-600 disabled:opacity-40 rounded-lg transition-colors cursor-pointer shrink-0">
+                    {randomising ? <span className="w-3.5 h-3.5 border-2 border-amber-100/80 border-t-transparent rounded-full animate-spin" /> : <IconDice className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Topic input */}
+                <input value={topic} onChange={e => setTopic(e.target.value)} onKeyDown={e => e.key === 'Enter' && start()}
+                  placeholder="Enter a debate topic or question…" disabled={running}
+                  className="w-full bg-gray-800/50 border border-white/8 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500/50 placeholder-gray-600 transition-colors" />
+
+                {/* Mobile row 3: Begin Session (+ Reset if applicable) */}
+                <div className="flex lg:hidden gap-2 items-center">
+                  <button onClick={start} disabled={!topic.trim()}
+                    className="flex-1 px-5 py-2 rounded-lg font-semibold text-sm transition-all cursor-pointer
+                      bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed
+                      ring-1 ring-indigo-500/30 shadow-lg shadow-indigo-900/30">
+                    Begin Session
+                  </button>
+                  {(messages.length > 0 || topic.trim()) && (
+                    <button onClick={reset}
+                      className="px-3 py-2 rounded-lg text-sm border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 transition-colors cursor-pointer shrink-0">
+                      Reset
+                    </button>
                   )}
                 </div>
-                <div className="relative shrink-0" title={!isPro ? 'Upgrade to Pro to change style' : undefined}>
-                  <select
-                    value={style}
-                    onChange={e => { if (isPro) setStyle(e.target.value) }}
-                    disabled={randomising}
-                    style={{ colorScheme: 'dark' }}
-                    className={`bg-gray-700 border border-gray-600 rounded-xl px-3 py-2.5 text-base text-gray-200 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-40 ${!isPro ? 'pr-8' : ''}`}
-                  >
-                    {STYLES.map(s => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                  {!isPro && (
-                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 text-xs font-bold">🔒</span>
-                  )}
+
+              </div>
+            )}
+
+            {/* ── LIVE ── */}
+            {running && !paused && (
+              <div className="hidden lg:flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-950/50 border border-red-800/40 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-red-500 live-dot" />
+                  <span className="text-red-400 text-[10px] font-semibold tracking-widest uppercase font-mono">Live</span>
+                  <span className="text-gray-300 font-mono text-sm">{formatTime(elapsed)}</span>
                 </div>
+                <div className="flex-1" />
                 <button
-                  onClick={randomise}
-                  disabled={randomising}
-                  title="Randomise characters and topic"
-                  className="px-4 py-2.5 bg-amber-700 hover:bg-amber-600 disabled:opacity-40 rounded-xl text-base font-medium transition-colors cursor-pointer shrink-0"
-                >
-                  {randomising
-                    ? <span className="inline-block w-4 h-4 border-2 border-amber-100/80 border-t-transparent rounded-full animate-spin" />
-                    : <IconDice className="w-5 h-5" />}
+                  onClick={() => { const n = !mutedRef.current; setMuted(n); if (n && currentAudioRef.current) currentAudioRef.current.pause() }}
+                  title={muted ? 'Unmute' : 'Mute'}
+                  className={`p-2.5 rounded-lg border transition-colors cursor-pointer shrink-0
+                    ${muted ? 'bg-gray-800 border-red-700/40 text-red-400' : 'bg-gray-800/60 border-white/8 text-gray-400 hover:text-gray-200'}`}>
+                  {muted ? <IconVolumeOff className="w-4 h-4" /> : <IconVolumeOn className="w-4 h-4" />}
+                </button>
+                <button onClick={pause}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm shrink-0
+                    bg-yellow-900/30 hover:bg-yellow-900/50 border border-yellow-700/40 text-yellow-300
+                    transition-all cursor-pointer">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  <span className="hidden sm:inline">Pause</span>
                 </button>
               </div>
-            ) : paused && !summaryLoading ? (
-              <button
-                onClick={fetchSummary}
-                disabled={messages.length < 2 || !!summary}
-                className="w-full sm:w-auto px-5 py-2.5 bg-amber-700 hover:bg-amber-600 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-base font-medium transition-colors cursor-pointer"
-              >
-                Generate Summary
-              </button>
-            ) : null}
-          </div>
+            )}
 
-          {/* Topic input — hidden when session is active (we already know the question) */}
-          <input
-            value={topic}
-            onChange={e => setTopic(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && start()}
-            placeholder="Enter a debate question or prompt..."
-            disabled={running}
-            className={`w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-indigo-500 placeholder-gray-500 disabled:opacity-50 shrink-0 ${(running || paused) ? 'hidden' : ''}`}
-          />
+            {/* ── PAUSED ── */}
+            {running && paused && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-950/40 border border-yellow-800/30 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                  <span className="text-yellow-400 text-[10px] font-semibold tracking-widest uppercase font-mono">Paused</span>
+                  <span className="text-gray-400 font-mono text-sm">{formatTime(elapsed)}</span>
+                </div>
+                <div className="flex-1" />
+                {!summaryLoading && (
+                  <button onClick={fetchSummary} disabled={!!summary || messages.length < 2}
+                    className="px-3 py-2 rounded-lg text-sm font-medium border transition-all cursor-pointer shrink-0
+                      bg-amber-950/40 hover:bg-amber-950/70 border-amber-700/30 text-amber-300
+                      disabled:opacity-40 disabled:cursor-not-allowed">
+                    <span className="hidden sm:inline">Generate </span>Summary
+                  </button>
+                )}
+                <button onClick={reset}
+                  className="px-3 py-2 rounded-lg text-sm border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 transition-colors cursor-pointer shrink-0">
+                  Reset
+                </button>
+                <button
+                  onClick={() => setImagesEnabled(m => !m)}
+                  title={imagesEnabled ? 'Disable image generation' : 'Enable image generation'}
+                  className={`px-2.5 py-2 rounded-lg text-sm transition-colors cursor-pointer border shrink-0 ${imagesEnabled ? 'bg-violet-900/60 text-violet-300 border-violet-700/40' : 'bg-gray-800/90 text-red-300 border-red-700/50'}`}
+                >
+                  <IconImage className="w-4 h-4" />
+                </button>
+                <button onClick={resumeDebate}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm shrink-0
+                    bg-green-900/30 hover:bg-green-900/50 border border-green-700/40 text-green-300
+                    transition-all cursor-pointer">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+                  <span className="hidden sm:inline">Resume</span>
+                </button>
+              </div>
+            )}
+
+          </div>
 
           {/* Quota alerts banner */}
           {(quotaAlerts.tts || quotaAlerts.image) && (
@@ -1781,7 +1766,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
           {/* Conversation transcript — scrolls within panel */}
           {messages.length > 0 && (
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
+            <div className={`flex-1 overflow-y-auto space-y-3 pr-1 min-h-0 ${running && !paused && isMobile ? 'pb-32' : ''}`}>
               {messages.map((msg, i) => {
                 if (msg.persona === 'host') {
                   const isHostSpeaking = speaking === 'host' && i === 0
@@ -1817,11 +1802,25 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                 const p = PERSONAS[msg.persona]
                 const isActive = speaking === msg.persona && i === messages.length - 1
                 return (
-                  <div key={i} className="flex gap-3">
-                    <div className={`w-2 rounded-full shrink-0 mt-1 ${p.dot} ${isActive ? 'animate-pulse' : ''}`} style={{ minHeight: '1rem' }} />
-                    <div className={`rounded-2xl px-4 py-2.5 text-base flex-1 ${p.color} ${isActive ? `ring-1 ${p.ring}` : ''}`}>
-                      <span className="text-sm font-semibold opacity-70 block mb-1">{names[msg.persona]}</span>
-                      {msg.content.replace(/\*+/g, '')}
+                  <div key={i} className={`flex gap-3 transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-75'}`}>
+                    <div className={`w-0.5 rounded-full shrink-0 mt-1 ${p.dot} ${isActive ? 'opacity-100' : 'opacity-30'}`} style={{ minHeight: '1rem' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[11px] font-semibold tracking-wider uppercase font-mono opacity-60 ${p.barColor.replace('bg-','text-')}`}>
+                          {names[msg.persona]}
+                        </span>
+                        {isActive && (
+                          <div className="flex items-end gap-px h-3">
+                            {[0,1,2].map(j => (
+                              <div key={j} className={`w-0.5 rounded-full ${p.dot} speaking-bar`}
+                                style={{ height: '100%', animationDelay: `${j*0.15}s` }} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className={`text-sm leading-relaxed ${isActive ? 'text-gray-100' : 'text-gray-300'}`}>
+                        {msg.content.replace(/\*+/g, '')}
+                      </p>
                     </div>
                   </div>
                 )
@@ -1855,41 +1854,50 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
               {/* Summary card */}
               {summary && !summaryLoading && (
-                <div className="flex gap-3">
-                  <div className="w-2 rounded-full shrink-0 mt-1 bg-amber-400" style={{ minHeight: '1rem' }} />
-                  <div className="rounded-2xl px-5 py-4 text-base flex-1 bg-gradient-to-br from-amber-950 to-amber-900 border border-amber-700/60 shadow-lg shadow-amber-900/30">
-                    <span className="text-sm font-bold text-amber-300 block mb-3 uppercase tracking-wider">Debate Summary</span>
-                    <div className="mb-4 px-3 py-2 rounded-xl bg-black/30 text-center">
-                      <span className="text-lg font-bold text-amber-200">
-                        {summary.winner === 'draw' ? 'Draw!' : `Winner: ${summary.winner === 'A' ? names.A : names.B}`}
-                      </span>
-                      <p className="text-sm text-amber-100/70 mt-1">{summary.winnerReasoning}</p>
+                <div className="flex gap-3 verdict-reveal">
+                  <div className="w-0.5 rounded-full shrink-0 mt-1 bg-amber-400" style={{ minHeight: '1rem' }} />
+                  <div className="flex-1 rounded-xl overflow-hidden border border-amber-700/30 bg-gradient-to-b from-amber-950/50 to-gray-900/60">
+                    {/* Header */}
+                    <div className="px-4 py-2.5 bg-amber-900/20 border-b border-amber-700/20 flex items-center gap-3">
+                      <span className="text-amber-400 text-[10px] font-mono font-semibold tracking-widest uppercase">Verdict</span>
+                      <div className="flex-1 h-px bg-amber-700/20" />
+                      {summary.confidence && (
+                        <span className="text-amber-500/70 text-[10px] font-mono">{summary.confidence}% confidence</span>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <span className="text-sm font-semibold text-blue-400 block mb-1">{names.A}</span>
-                        <ul className="space-y-1">
-                          {summary.keyArgumentsA?.map((arg, i) => (
-                            <li key={i} className="text-sm text-white/70 flex gap-1.5">
-                              <span className="text-blue-400 shrink-0">-</span>
+                    <div className="px-4 py-4 flex flex-col gap-3">
+                      {summary.winner && (
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-lg font-bold text-white">
+                            {summary.winner === 'draw' ? 'Draw' : summary.winner === 'A' ? names.A : names.B}
+                          </span>
+                          <span className="text-amber-400/50 text-sm">
+                            {summary.winner === 'draw' ? '— no winner' : 'wins this debate'}
+                          </span>
+                        </div>
+                      )}
+                      {summary.confidence && (
+                        <div className="h-0.5 rounded-full bg-gray-800 overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-amber-700 to-amber-400 transition-all duration-1000"
+                            style={{ width: `${Math.min(100, summary.confidence)}%` }} />
+                        </div>
+                      )}
+                      {summary.winnerArgs?.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                          {summary.winnerArgs.map((arg, i) => (
+                            <div key={i} className="flex gap-2 text-sm text-gray-300 leading-snug">
+                              <span className="text-amber-600/70 shrink-0 font-mono text-xs mt-0.5">—</span>
                               <span>{arg}</span>
-                            </li>
+                            </div>
                           ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <span className="text-sm font-semibold text-purple-400 block mb-1">{names.B}</span>
-                        <ul className="space-y-1">
-                          {summary.keyArgumentsB?.map((arg, i) => (
-                            <li key={i} className="text-sm text-white/70 flex gap-1.5">
-                              <span className="text-purple-400 shrink-0">-</span>
-                              <span>{arg}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                        </div>
+                      )}
+                      {summary.analysis && (
+                        <p className="text-xs text-gray-500 italic leading-relaxed border-t border-white/5 pt-2.5">
+                          {summary.analysis}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-sm text-white/60 italic border-t border-amber-700/40 pt-2">{summary.analysis}</p>
                   </div>
                 </div>
               )}
@@ -1920,7 +1928,8 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
           {/* Avatar stage — compact strip on mobile, full cards on sm+ */}
 
-          {/* Mobile: compact horizontal strip */}
+          {/* Mobile: compact horizontal strip — hidden during live (shown in fixed HUD instead) */}
+          {!(running && !paused) && (
           <div className={`sm:hidden flex items-center gap-2 shrink-0 ${listening ? 'pb-8' : ''}`}>
             {(['A', 'B']).map((persona, i) => {
               const p = PERSONAS[persona]
@@ -1974,6 +1983,7 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
               )
             })}
           </div>
+          )}
 
           {/* Desktop/tablet: full avatar cards */}
           <div className={`hidden sm:flex flex-row gap-3 shrink-0 ${listening ? 'pb-10' : ''}`}>
@@ -2087,15 +2097,15 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
 
           {/* Thumbnail strip */}
           {imageKeys.length > 1 && (
-            <div className="flex flex-wrap gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 overflow-x-auto pb-1">
               {imageKeys.map(idx => {
                 const persona = messages[idx]?.persona
-                const ring = persona ? PERSONAS[persona].ring : 'ring-gray-500'
+                const ring = (persona && PERSONAS[persona]) ? PERSONAS[persona].ring : 'ring-gray-500'
                 return (
                   <button
                     key={idx}
                     onClick={() => setViewIndex(idx)}
-                    className={`rounded-lg overflow-hidden ring-2 transition-all cursor-pointer
+                    className={`rounded-lg overflow-hidden ring-2 transition-all cursor-pointer shrink-0
                       ${displayIndex === idx ? ring : 'ring-transparent opacity-60 hover:opacity-100'}`}
                   >
                     <img src={images[idx]} alt="" className="w-24 h-14 object-cover block" />
@@ -2128,6 +2138,73 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
           </div>
         </div>
       </div>
+
+      {/* Mobile live HUD — fixed bottom bar, only shown on mobile while live */}
+      {running && !paused && isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 z-50
+          bg-gray-950/96 backdrop-blur-md border-t border-white/8
+          px-4 pt-3"
+          style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+          {/* Persona strip */}
+          <div className="flex items-center gap-2 mb-2.5">
+            {(['A','B']).map((persona, idx) => {
+              const p = PERSONAS[persona]
+              const active = speaking === persona
+              const emotion = emotions[persona]
+              return (
+                <React.Fragment key={persona}>
+                  <div className={`flex-1 flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all duration-300 min-w-0
+                    ${active ? `bg-white/5 ring-1 ${p.ring}` : 'bg-white/[0.02]'}`}>
+                    {active ? (
+                      <div className="flex items-end gap-px shrink-0" style={{ height: '14px', width: '10px' }}>
+                        {[0,1,2].map(j => (
+                          <div key={j} className={`w-0.5 rounded-full ${p.dot} speaking-bar`}
+                            style={{ height: '100%', animationDelay: `${j*0.15}s` }} />
+                        ))}
+                      </div>
+                    ) : (
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${p.dot}`} />
+                    )}
+                    <span className={`text-xs font-semibold truncate ${active ? 'text-white' : 'text-gray-400'}`}>
+                      {names[persona]}
+                    </span>
+                    {emotion && EMOTIONS[emotion] && (
+                      <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 text-white ${EMOTIONS[emotion].color}`}>
+                        {EMOTIONS[emotion].label}
+                      </span>
+                    )}
+                  </div>
+                  {idx === 0 && (
+                    <span className="text-[10px] font-mono text-gray-700 shrink-0">vs</span>
+                  )}
+                </React.Fragment>
+              )
+            })}
+          </div>
+          {/* Controls */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-red-950/40 border border-red-800/30 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 live-dot" />
+              <span className="text-red-400 text-[10px] font-mono font-semibold tracking-widest">LIVE</span>
+              <span className="text-gray-300 text-xs font-mono">{formatTime(elapsed)}</span>
+            </div>
+            <div className="flex-1" />
+            <button
+              onClick={() => { const n = !mutedRef.current; setMuted(n); if (n && currentAudioRef.current) currentAudioRef.current.pause() }}
+              className={`p-2.5 rounded-lg border transition-colors cursor-pointer shrink-0
+                ${muted ? 'border-red-700/40 text-red-400 bg-red-950/20' : 'border-white/8 text-gray-400 bg-white/5'}`}>
+              {muted ? <IconVolumeOff className="w-4 h-4" /> : <IconVolumeOn className="w-4 h-4" />}
+            </button>
+            <button onClick={pause}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold shrink-0
+                bg-yellow-900/20 border border-yellow-700/30 text-yellow-300
+                hover:bg-yellow-900/40 transition-all cursor-pointer">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              Pause
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
