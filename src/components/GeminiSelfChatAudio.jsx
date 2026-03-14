@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { saveMessage, updateDebateSummary } from '../lib/debateDb'
 import { supabase } from '../lib/supabaseClient'
@@ -1584,15 +1584,15 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
                 <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
                   <span className="text-gray-300 font-mono">{formatTime(elapsed)}</span>
-                  <span className="text-gray-600 hidden sm:inline">/</span>
-                  <span className="text-gray-500 font-mono hidden sm:inline">10:00</span>
+                  <span className="text-gray-600 hidden lg:inline">/</span>
+                  <span className="text-gray-500 font-mono hidden lg:inline">10:00</span>
                 </div>
               ) : paused ? (
                 <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-yellow-700 rounded-xl text-base shrink-0">
                   <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full" />
                   <span className="text-yellow-300 font-mono">{formatTime(elapsed)}</span>
-                  <span className="text-gray-600 hidden sm:inline">/</span>
-                  <span className="text-gray-500 font-mono hidden sm:inline">10:00</span>
+                  <span className="text-gray-600 hidden lg:inline">/</span>
+                  <span className="text-gray-500 font-mono hidden lg:inline">10:00</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-base shrink-0 text-gray-500">
@@ -1619,14 +1619,14 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
               >
                 <IconImage />
               </button>
-              {/* Category badge — desktop only when running */}
+              {/* Category badge — split-view only (lg+) */}
               {(running || paused) && (
-                <span className="hidden sm:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-sm font-medium shrink-0">
+                <span className="hidden lg:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-900/60 border border-amber-700/40 text-amber-200 text-sm font-medium shrink-0">
                   {CATEGORIES.find(c => c.value === category)?.label || category}
                 </span>
               )}
               {(running || paused) && style !== 'ai' && (
-                <span className="hidden sm:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-sm font-medium shrink-0">
+                <span className="hidden lg:inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-indigo-900/60 border border-indigo-700/40 text-indigo-200 text-sm font-medium shrink-0">
                   {STYLES.find(s => s.value === style)?.label || style}
                 </span>
               )}
@@ -1716,14 +1716,14 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
             ) : null}
           </div>
 
-          {/* Topic input — below controls */}
+          {/* Topic input — hidden when session is active (we already know the question) */}
           <input
             value={topic}
             onChange={e => setTopic(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && start()}
             placeholder="Enter a debate question or prompt..."
             disabled={running}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-indigo-500 placeholder-gray-500 disabled:opacity-50 shrink-0"
+            className={`w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-indigo-500 placeholder-gray-500 disabled:opacity-50 shrink-0 ${(running || paused) ? 'hidden' : ''}`}
           />
 
           {/* Quota alerts banner */}
@@ -1895,8 +1895,65 @@ export default function GeminiSelfChatAudio({ userApiKey = '', user = null, isPr
         {/* Right: avatars + image panel */}
         <div className="w-full flex-1 flex flex-col gap-3 min-w-0 min-h-[50vh] lg:min-h-0 overflow-visible">
 
-          {/* Avatar stage */}
-          <div className={`flex flex-col sm:flex-row gap-3 shrink-0 ${listening ? 'pb-10' : ''}`}>
+          {/* Avatar stage — compact strip on mobile, full cards on sm+ */}
+
+          {/* Mobile: compact horizontal strip */}
+          <div className={`sm:hidden flex items-center gap-2 shrink-0 ${listening ? 'pb-8' : ''}`}>
+            {(['A', 'B']).map((persona, i) => {
+              const p = PERSONAS[persona]
+              const isSpeaking = speaking === persona
+              const isLoadingVoice = loadingVoice === persona
+              const emotion = emotions[persona]
+              return (
+                <React.Fragment key={persona}>
+                  <div className={`flex-1 rounded-xl px-3 py-2 ${p.avatarBg} flex items-center gap-2 min-w-0 transition-all duration-300
+                    ${isSpeaking ? `ring-2 ${p.ring} shadow-md ${p.glow}` : 'ring-1 ring-white/10'}`}>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${p.dot} ${isSpeaking ? 'animate-pulse' : ''}`} />
+                    <span className={`text-sm font-semibold truncate ${p.barColor.replace('bg-', 'text-')} `}>{names[persona]}</span>
+                    {isSpeaking ? (
+                      <span className={`text-xs ${p.barColor.replace('bg-', 'text-')} animate-pulse font-semibold shrink-0`}>speaking…</span>
+                    ) : isLoadingVoice ? (
+                      <span className="text-xs text-cyan-400 animate-pulse shrink-0">loading…</span>
+                    ) : emotion && EMOTIONS[emotion] ? (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold text-white shrink-0 ${EMOTIONS[emotion].color}`}>
+                        <EmotionIcon icon={EMOTIONS[emotion].icon} className="w-3 h-3" />
+                        <span>{EMOTIONS[emotion].label}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  {i === 0 && (
+                    <div className="relative flex flex-col items-center shrink-0">
+                      {running ? (
+                        <button
+                          onClick={handleInterrupt}
+                          title={listening ? 'Stop listening' : 'Redirect'}
+                          className={`flex items-center justify-center transition-all cursor-pointer
+                            ${inputMode === 'voice' ? 'w-10 h-10 rounded-full' : 'w-8 h-8 rounded-full'}
+                            ${listening
+                              ? 'bg-red-600 animate-pulse text-white ring-2 ring-red-400'
+                              : inputMode === 'voice'
+                                ? 'bg-indigo-700 hover:bg-indigo-600 text-white ring-2 ring-indigo-500'
+                                : 'bg-gray-700 hover:bg-gray-500 text-gray-300'}`}
+                        >
+                          {listening ? <IconStop className="w-4 h-4" /> : <IconMic className="w-4 h-4" />}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-indigo-400 opacity-60">vs</span>
+                      )}
+                      {listening && interimText && (
+                        <p className="absolute top-full z-20 mt-1 w-max max-w-[160px] -translate-x-1/2 left-1/2 rounded-md border border-green-500/40 bg-black/80 px-2 py-1 text-xs text-green-300 text-center italic leading-snug whitespace-normal break-words shadow-lg">
+                          {interimText}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </React.Fragment>
+              )
+            })}
+          </div>
+
+          {/* Desktop/tablet: full avatar cards */}
+          <div className={`hidden sm:flex flex-row gap-3 shrink-0 ${listening ? 'pb-10' : ''}`}>
             <AIAvatar
               persona="A"
               isSpeaking={speaking === 'A'}
