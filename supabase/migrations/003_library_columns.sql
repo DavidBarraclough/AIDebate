@@ -19,6 +19,6 @@ alter table public.debates
   add column if not exists library_category text;
 
 -- ─── indexes ─────────────────────────────────────────────────────────────────
-
+-- Run separately if not already applied:
 create index if not exists debates_is_library_idx  on public.debates (is_library) where is_library = true;
 create index if not exists debates_is_featured_idx on public.debates (is_featured) where is_featured = true;
