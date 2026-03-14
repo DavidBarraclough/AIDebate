@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getDebateWithMessages } from '../lib/debateDb'
 
 const STYLE_LABELS = {
@@ -67,6 +67,7 @@ function WinnerBadge({ summary, nameA, nameB }) {
 
 export default function DebateSharePage() {
   const { debateId } = useParams()
+  const navigate = useNavigate()
   const [debate, setDebate] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
@@ -128,15 +129,23 @@ export default function DebateSharePage() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans">
       {/* Header */}
-      <header className="border-b border-gray-800 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-        <Link to="/" className="text-sm font-semibold text-indigo-300 hover:text-indigo-200 transition-colors">
+      <header className="border-b border-gray-800 px-4 sm:px-6 py-3 flex items-center gap-3">
+        <Link to="/" className="text-sm font-semibold text-indigo-300 hover:text-indigo-200 transition-colors shrink-0">
           ← AI Debate Studio
         </Link>
+        <div className="flex-1" />
+        <button
+          onClick={() => navigate(`/replay/${debateId}`)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-700/80 hover:bg-indigo-600 text-xs font-semibold text-white transition-colors cursor-pointer shrink-0"
+        >
+          <svg className="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+          Watch replay
+        </button>
         <button
           onClick={handleCopyLink}
-          className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 text-xs font-medium text-gray-200 hover:bg-gray-800 transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-900 text-xs font-medium text-gray-200 hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
         >
-          {copied ? 'Copied!' : 'Copy Link'}
+          {copied ? 'Copied!' : 'Copy link'}
         </button>
       </header>
 
